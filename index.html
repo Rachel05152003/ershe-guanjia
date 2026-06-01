@@ -1066,7 +1066,7 @@ function handleLogin() {
       errorEl.textContent = '密码至少4位';
       return;
     }
-    const role = accounts.length === 0 ? 'admin' : (document.getElementById('login-role').value || 'employee');
+    const role = accounts.length === 0 ? 'admin' : 'employee'; // First account = admin, all others = employee
     const newAccount = {
       username,
       password: btoa(password), // Simple encoding (not encryption, but sufficient for local app)
