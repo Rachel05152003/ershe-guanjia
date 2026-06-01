@@ -1228,12 +1228,29 @@ function doQuickAddEmployee() {
 // ====== Cloud Sync (GitHub-based) ======
 let _dirtyPush = false; // Track if we have unsaved local changes
 
+// Strip base64 images from products for cloud sync (too large for GitHub)
+function stripImagesForSync(prods) {
+  return prods.map(p => {
+    const clone = {...p};
+    // Replace base64 images with just a count marker
+    if (clone.images && clone.images.length > 0) {
+      clone.images = clone.images.map(img => {
+        // If it's a base64 data URL, replace with placeholder
+        if (img.startsWith('data:')) return `[img:${img.length}]`;
+        return img; // Keep URLs as-is
+      });
+    }
+    return clone;
+  });
+}
+
 async function cloudAutoSync() {
   if (syncInProgress || !currentUser) return;
   try {
     syncInProgress = true;
     _dirtyPush = false;
-    const data = { products, accounts, updated: new Date().toISOString() };
+    const syncProducts = stripImagesForSync(products);
+    const data = { products: syncProducts, accounts, updated: new Date().toISOString() };
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
     
     let body = { content, message: `同步数据 - ${new Date().toLocaleString('zh-CN')}` };
@@ -1287,10 +1304,14 @@ async function cloudPullAndRetry() {
     const localProducts = [...products];
     const localAccounts = [...accounts];
     
+    // Build a map of local images to preserve them
+    const localImageMap = {};
+    localProducts.forEach(p => { localImageMap[p.id] = p.images || []; });
+    
     // Merge: local data is ALWAYS priority (user just entered it)
     const cloudIds = new Set(cloudData.products.map(p => p.id));
     
-    // Start with cloud data
+    // Start with cloud data, but restore local images
     const merged = cloudData.products.map(cp => {
       if (!cp.createdBy) cp.createdBy = '';
       const lp = localProducts.find(p => p.id === cp.id);
@@ -1298,8 +1319,13 @@ async function cloudPullAndRetry() {
         // Local version always wins if it was modified more recently
         const lpTime = new Date(lp.updatedAt || lp.createdAt || 0).getTime();
         const cpTime = new Date(cp.updatedAt || cp.createdAt || 0).getTime();
-        return lpTime >= cpTime ? lp : cp;
+        const winner = lpTime >= cpTime ? lp : cp;
+        // But ALWAYS keep local images (cloud images are stripped)
+        winner.images = localImageMap[winner.id] || winner.images || [];
+        return winner;
       }
+      // Cloud-only product - restore local images if we have them
+      cp.images = localImageMap[cp.id] || cp.images || [];
       return cp;
     });
     
@@ -1336,8 +1362,9 @@ async function cloudPullAndRetry() {
       }
     }
     
-    // Now push the merged data
-    const pushData = { products, accounts, updated: new Date().toISOString() };
+    // Now push the merged data (strip images to keep file small)
+    const syncProducts = stripImagesForSync(products);
+    const pushData = { products: syncProducts, accounts, updated: new Date().toISOString() };
     const pushContent = btoa(unescape(encodeURIComponent(JSON.stringify(pushData))));
     const pushBody = { content: pushContent, sha: cloudSha, message: `合并同步 - ${new Date().toLocaleString('zh-CN')}` };
     
@@ -1415,7 +1442,10 @@ async function cloudPull(silent = false) {
       }
     }
     
-    // Merge products - local data has priority
+    // Merge products - local data has priority, preserve local images
+    const localImageMap = {};
+    products.forEach(p => { localImageMap[p.id] = p.images || []; });
+    
     const cloudIds = new Set(data.products.map(p => p.id));
     const localOnly = products.filter(p => !cloudIds.has(p.id));
     const merged = data.products.map(cp => {
@@ -1424,8 +1454,13 @@ async function cloudPull(silent = false) {
       if (lp) {
         const lpTime = new Date(lp.updatedAt || lp.createdAt || 0).getTime();
         const cpTime = new Date(cp.updatedAt || cp.createdAt || 0).getTime();
-        return lpTime >= cpTime ? lp : cp;
+        const winner = lpTime >= cpTime ? lp : cp;
+        // Always keep local images (cloud images are stripped)
+        winner.images = localImageMap[winner.id] || winner.images || [];
+        return winner;
       }
+      // Cloud-only: restore local images if available
+      cp.images = localImageMap[cp.id] || cp.images || [];
       return cp;
     });
     localOnly.forEach(p => merged.push(p));
