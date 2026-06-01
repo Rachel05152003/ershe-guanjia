@@ -1228,20 +1228,77 @@ function doQuickAddEmployee() {
 // ====== Cloud Sync (GitHub-based) ======
 let _dirtyPush = false; // Track if we have unsaved local changes
 
-// Strip base64 images from products for cloud sync (too large for GitHub)
+// Strip base64 images from products for cloud sync (upload separately)
 function stripImagesForSync(prods) {
   return prods.map(p => {
     const clone = {...p};
-    // Replace base64 images with just a count marker
+    // Keep image URLs (http/https), remove base64 data
     if (clone.images && clone.images.length > 0) {
       clone.images = clone.images.map(img => {
-        // If it's a base64 data URL, replace with placeholder
-        if (img.startsWith('data:')) return `[img:${img.length}]`;
-        return img; // Keep URLs as-is
-      });
+        if (img.startsWith('data:')) return ''; // Will be replaced with URL after upload
+        return img;
+      }).filter(Boolean);
     }
     return clone;
   });
+}
+
+// Upload images to GitHub and return URLs
+async function uploadImagesToGitHub(prods) {
+  const headers = {
+    'Authorization': `token ${GITHUB_TOKEN}`,
+    'Content-Type': 'application/json',
+    'Accept': 'application/vnd.github.v3+json'
+  };
+  
+  for (const p of prods) {
+    if (!p.images || p.images.length === 0) continue;
+    
+    const newImages = [];
+    for (let i = 0; i < p.images.length; i++) {
+      const img = p.images[i];
+      if (img.startsWith('http')) {
+        // Already a URL, keep it
+        newImages.push(img);
+        continue;
+      }
+      if (img.startsWith('data:')) {
+        // Upload base64 image to GitHub
+        try {
+          const filename = `img_${p.id}_${i}_${Date.now()}.jpg`;
+          const path = `images/${filename}`;
+          
+          // Extract base64 data
+          const base64Data = img.split(',')[1];
+          
+          const body = {
+            content: base64Data,
+            message: `上传图片 ${filename}`,
+            branch: 'main'
+          };
+          
+          const resp = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${path}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(body)
+          });
+          
+          if (resp.ok) {
+            const url = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${path}`;
+            newImages.push(url);
+          } else {
+            newImages.push(img); // Keep base64 as fallback
+          }
+        } catch(e) {
+          newImages.push(img); // Keep base64 as fallback
+        }
+      } else {
+        newImages.push(img);
+      }
+    }
+    p.images = newImages;
+  }
+  return prods;
 }
 
 async function cloudAutoSync() {
@@ -1249,6 +1306,13 @@ async function cloudAutoSync() {
   try {
     syncInProgress = true;
     _dirtyPush = false;
+    
+    // First, upload any base64 images to GitHub
+    await uploadImagesToGitHub(products);
+    // Save updated image URLs locally
+    localStorage.setItem('luxe_products', JSON.stringify(products));
+    
+    // Then strip images for data.json (URLs are already stored in products)
     const syncProducts = stripImagesForSync(products);
     const data = { products: syncProducts, accounts, updated: new Date().toISOString() };
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
@@ -1311,7 +1375,7 @@ async function cloudPullAndRetry() {
     // Merge: local data is ALWAYS priority (user just entered it)
     const cloudIds = new Set(cloudData.products.map(p => p.id));
     
-    // Start with cloud data, but restore local images
+    // Start with cloud data, but smart merge images
     const merged = cloudData.products.map(cp => {
       if (!cp.createdBy) cp.createdBy = '';
       const lp = localProducts.find(p => p.id === cp.id);
@@ -1319,13 +1383,21 @@ async function cloudPullAndRetry() {
         // Local version always wins if it was modified more recently
         const lpTime = new Date(lp.updatedAt || lp.createdAt || 0).getTime();
         const cpTime = new Date(cp.updatedAt || cp.createdAt || 0).getTime();
-        const winner = lpTime >= cpTime ? lp : cp;
-        // But ALWAYS keep local images (cloud images are stripped)
-        winner.images = localImageMap[winner.id] || winner.images || [];
+        const winner = lpTime >= cpTime ? {...lp} : {...cp};
+        // Smart image merge
+        const localImgs = localImageMap[winner.id] || [];
+        const hasLocalBase64 = localImgs.some(img => img.startsWith('data:'));
+        if (hasLocalBase64) {
+          winner.images = localImgs;
+        } else if (cp.images && cp.images.length > 0) {
+          winner.images = cp.images;
+        } else {
+          winner.images = localImgs;
+        }
         return winner;
       }
-      // Cloud-only product - restore local images if we have them
-      cp.images = localImageMap[cp.id] || cp.images || [];
+      // Cloud-only product - use cloud image URLs directly
+      cp.images = cp.images || [];
       return cp;
     });
     
@@ -1442,7 +1514,7 @@ async function cloudPull(silent = false) {
       }
     }
     
-    // Merge products - local data has priority, preserve local images
+    // Merge products - local data has priority, sync image URLs from cloud
     const localImageMap = {};
     products.forEach(p => { localImageMap[p.id] = p.images || []; });
     
@@ -1454,13 +1526,22 @@ async function cloudPull(silent = false) {
       if (lp) {
         const lpTime = new Date(lp.updatedAt || lp.createdAt || 0).getTime();
         const cpTime = new Date(cp.updatedAt || cp.createdAt || 0).getTime();
-        const winner = lpTime >= cpTime ? lp : cp;
-        // Always keep local images (cloud images are stripped)
-        winner.images = localImageMap[winner.id] || winner.images || [];
+        const winner = lpTime >= cpTime ? {...lp} : {...cp};
+        // Smart image merge: keep local base64 if present, otherwise use cloud URLs
+        const localImgs = localImageMap[winner.id] || [];
+        const hasLocalBase64 = localImgs.some(img => img.startsWith('data:'));
+        if (hasLocalBase64) {
+          winner.images = localImgs;
+        } else if (cp.images && cp.images.length > 0) {
+          // Use cloud image URLs (these are GitHub URLs, accessible from any device)
+          winner.images = cp.images;
+        } else {
+          winner.images = localImgs;
+        }
         return winner;
       }
-      // Cloud-only: restore local images if available
-      cp.images = localImageMap[cp.id] || cp.images || [];
+      // Cloud-only product - use cloud image URLs directly
+      cp.images = cp.images || [];
       return cp;
     });
     localOnly.forEach(p => merged.push(p));
