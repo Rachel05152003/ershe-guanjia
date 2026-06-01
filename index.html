@@ -143,6 +143,7 @@ input,select,textarea,button { font-family:inherit; font-size:14px; }
 
 /* Toast animation */
 @keyframes fadeInOut { 0%{opacity:0;transform:translateX(-50%) translateY(-10px)} 15%{opacity:1;transform:translateX(-50%) translateY(0)} 80%{opacity:1} 100%{opacity:0} }
+@keyframes toastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-10px)} 100%{opacity:1;transform:translateX(-50%) translateY(0)} }
 
 /* Print */
 @media print { .bottom-nav,.topbar { display:none; } body { padding:0; } .page { display:block!important; } .btn { display:none!important; } .img-upload-area { display:none!important; } #tab-stats-report .card { break-inside:avoid; } }
@@ -1577,15 +1578,19 @@ setInterval(() => {
   if (currentUser && !syncInProgress && !_dirtyPush) cloudPull(true);
 }, 60000);
 
-function showToast(msg) {
+function showToast(msg, duration = 3000) {
   const existing = document.getElementById('toast-msg');
   if (existing) existing.remove();
   const toast = document.createElement('div');
   toast.id = 'toast-msg';
-  toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:500;white-space:nowrap;animation:fadeInOut 3s ease;pointer-events:none;';
+  toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;padding:12px 24px;border-radius:20px;font-size:14px;font-weight:500;z-index:500;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.3);pointer-events:none;animation:toastIn .3s ease;';
   toast.textContent = msg;
   document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity .3s';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
 }
 
 // ====== Image Processing ======
@@ -1782,14 +1787,17 @@ function addProduct() {
     createdBy: currentUser ? currentUser.username : '',
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
   });
+  // Save to localStorage immediately (sync is debounced)
   save();
+  // Clear form AFTER data is saved
   clearForm();
+  // Refresh all views
   switchPage('home');
   refreshDashboard();
   renderInventory();
-  // Vibration feedback on success
+  // Vibration + toast feedback
   if (navigator.vibrate) navigator.vibrate(100);
-  showToast('✅ 入库成功！已保存1件商品');
+  showToast(`✅ 入库成功！${brand} ${model || ''}`, 3000);
 }
 
 function editProduct(id) {
