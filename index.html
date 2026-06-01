@@ -236,12 +236,6 @@ input,select,textarea,button { font-family:inherit; font-size:14px; }
 .fab { position:fixed; right:16px; bottom:80px; width:50px; height:50px; border-radius:50%; background:var(--accent); color:#fff; border:none; font-size:22px; cursor:pointer; box-shadow:0 4px 12px rgba(201,169,110,.4); z-index:90; display:flex; align-items:center; justify-content:center; transition:transform .2s; }
 .fab:active { transform:scale(.9); }
 
-/* Role-based visibility */
-.admin-only-stat { display:none; }
-.employee-only-stat { display:none; }
-body.role-admin .admin-only-stat { display:block; }
-body.role-employee .employee-only-stat { display:block; }
-
 /* Desktop */
 @media(min-width:768px) {
   body { max-width:500px; margin:0 auto; box-shadow:0 0 20px rgba(0,0,0,.1); min-height:100vh; }
@@ -298,40 +292,9 @@ body.role-employee .employee-only-stat { display:block; }
 
 <!-- Page: Dashboard -->
 <div class="page active" id="page-home">
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-label">在库商品</div>
-      <div class="stat-value accent" id="stat-count">0</div>
-    </div>
-    <div class="stat-card admin-only-stat">
-      <div class="stat-label">库存总成本</div>
-      <div class="stat-value warning" id="stat-cost">¥0</div>
-    </div>
-    <div class="stat-card admin-only-stat">
-      <div class="stat-label">累计销售额</div>
-      <div class="stat-value success" id="stat-revenue">¥0</div>
-    </div>
-    <div class="stat-card admin-only-stat">
-      <div class="stat-label">本月销售额</div>
-      <div class="stat-value accent" id="stat-month-revenue">¥0</div>
-    </div>
-    <div class="stat-card admin-only-stat">
-      <div class="stat-label">累计利润</div>
-      <div class="stat-value" id="stat-profit">¥0</div>
-    </div>
-    <div class="stat-card stat-full admin-only-stat">
-      <div class="stat-label">本月利润</div>
-      <div class="stat-value accent" id="stat-month-profit">¥0</div>
-    </div>
-    <!-- Employee-only stats -->
-    <div class="stat-card employee-only-stat">
-      <div class="stat-label">我录入的商品</div>
-      <div class="stat-value accent" id="stat-my-count">0</div>
-    </div>
-    <div class="stat-card stat-full employee-only-stat">
-      <div class="stat-label">可售商品</div>
-      <div class="stat-value success" id="stat-saleable">0</div>
-    </div>
+  <div class="stats-grid" id="stats-grid">
+    <!-- Dynamically rendered by JS -->
+  </div>
   </div>
 
   <!-- Quick Actions -->
@@ -779,39 +742,8 @@ body.role-employee .employee-only-stat { display:block; }
       <div class="card">
         <div class="card-title" id="report-title">📊 月度报表</div>
         <!-- Core Metrics -->
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-label">入库数量</div>
-            <div class="stat-value" id="rp-in-count">0</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">出库数量</div>
-            <div class="stat-value success" id="rp-out-count">0</div>
-          </div>
-          <div class="stat-card admin-only-stat">
-            <div class="stat-label">购入成本</div>
-            <div class="stat-value warning" id="rp-cost">¥0</div>
-          </div>
-          <div class="stat-card admin-only-stat">
-            <div class="stat-label">销售收入</div>
-            <div class="stat-value accent" id="rp-revenue">¥0</div>
-          </div>
-          <div class="stat-card admin-only-stat">
-            <div class="stat-label">利润</div>
-            <div class="stat-value" id="rp-profit">¥0</div>
-          </div>
-          <div class="stat-card admin-only-stat">
-            <div class="stat-label">利润率</div>
-            <div class="stat-value" id="rp-margin">0%</div>
-          </div>
-          <div class="stat-card stat-full admin-only-stat">
-            <div class="stat-label">期末库存件数</div>
-            <div class="stat-value accent" id="rp-stock-count">0</div>
-          </div>
-          <div class="stat-card stat-full admin-only-stat">
-            <div class="stat-label">期末库存总成本</div>
-            <div class="stat-value warning" id="rp-stock-cost">¥0</div>
-          </div>
+        <div class="stats-grid" id="report-stats-grid">
+          <!-- Dynamically rendered by JS -->
         </div>
       </div>
 
@@ -1700,7 +1632,53 @@ function deleteProduct(id) {
 }
 
 // ====== Dashboard ======
+function renderStatsGrid() {
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const grid = document.getElementById('stats-grid');
+  if (!grid) return;
+  
+  const adminCards = `
+    <div class="stat-card"><div class="stat-label">库存总成本</div><div class="stat-value warning" id="stat-cost">¥0</div></div>
+    <div class="stat-card"><div class="stat-label">累计销售额</div><div class="stat-value success" id="stat-revenue">¥0</div></div>
+    <div class="stat-card"><div class="stat-label">本月销售额</div><div class="stat-value accent" id="stat-month-revenue">¥0</div></div>
+    <div class="stat-card"><div class="stat-label">累计利润</div><div class="stat-value" id="stat-profit">¥0</div></div>
+    <div class="stat-card stat-full"><div class="stat-label">本月利润</div><div class="stat-value accent" id="stat-month-profit">¥0</div></div>
+  `;
+  
+  const employeeCards = `
+    <div class="stat-card"><div class="stat-label">我录入的商品</div><div class="stat-value accent" id="stat-my-count">0</div></div>
+    <div class="stat-card stat-full"><div class="stat-label">可售商品</div><div class="stat-value success" id="stat-saleable">0</div></div>
+  `;
+  
+  grid.innerHTML = `
+    <div class="stat-card"><div class="stat-label">在库商品</div><div class="stat-value accent" id="stat-count">0</div></div>
+    ${isAdmin ? adminCards : employeeCards}
+  `;
+}
+
+function renderReportStats() {
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const grid = document.getElementById('report-stats-grid');
+  if (!grid) return;
+  
+  const adminCards = `
+    <div class="stat-card"><div class="stat-label">购入成本</div><div class="stat-value warning" id="rp-cost">¥0</div></div>
+    <div class="stat-card"><div class="stat-label">销售收入</div><div class="stat-value accent" id="rp-revenue">¥0</div></div>
+    <div class="stat-card"><div class="stat-label">利润</div><div class="stat-value" id="rp-profit">¥0</div></div>
+    <div class="stat-card"><div class="stat-label">利润率</div><div class="stat-value" id="rp-margin">0%</div></div>
+    <div class="stat-card stat-full"><div class="stat-label">期末库存件数</div><div class="stat-value accent" id="rp-stock-count">0</div></div>
+    <div class="stat-card stat-full"><div class="stat-label">期末库存总成本</div><div class="stat-value warning" id="rp-stock-cost">¥0</div></div>
+  `;
+  
+  grid.innerHTML = `
+    <div class="stat-card"><div class="stat-label">入库数量</div><div class="stat-value" id="rp-in-count">0</div></div>
+    <div class="stat-card"><div class="stat-label">出库数量</div><div class="stat-value success" id="rp-out-count">0</div></div>
+    ${isAdmin ? adminCards : ''}
+  `;
+}
+
 function refreshDashboard() {
+  renderStatsGrid();
   const visible = getVisibleProducts();
   const inStock = visible.filter(p => p.status === '在库');
   const sold = visible.filter(p => p.status === '已售' || p.status === '代售');
@@ -1727,11 +1705,13 @@ function refreshDashboard() {
   document.getElementById('stat-month-profit').textContent = formatMoney(monthProfit);
   document.getElementById('stat-month-profit').className = 'stat-value accent ' + (monthProfit >= 0 ? '' : '');
 
-  // Employee stats
-  const myProducts = currentUser ? visible.filter(p => p.createdBy === currentUser.username) : [];
+  // Employee-only stats
   const myCount = document.getElementById('stat-my-count');
   const saleable = document.getElementById('stat-saleable');
-  if (myCount) myCount.textContent = myProducts.length;
+  if (myCount) {
+    const myProducts = currentUser ? visible.filter(p => p.createdBy === currentUser.username) : [];
+    myCount.textContent = myProducts.length;
+  }
   if (saleable) saleable.textContent = inStock.length;
 
   // Recent activity
@@ -2203,6 +2183,7 @@ function switchSalesTab(el, tabId) {
 
 // ====== Statistics ======
 function refreshStats() {
+  renderReportStats();
   const visible = getVisibleProducts();
   const inStock = visible.filter(p => p.status === '在库');
   const sold = visible.filter(p => p.status === '已售' || p.status === '代售');
