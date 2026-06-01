@@ -1103,8 +1103,21 @@ function updateTopbarUser() {
 function getVisibleProducts() {
   if (!currentUser) return products;
   if (currentUser.role === 'admin') return products;
-  // Employee: see own + proxy sales where they are the supplier
-  return products.filter(p => p.createdBy === currentUser.username);
+  // Employee: see own products + all in-stock items (but cost hidden)
+  return products.filter(p => p.createdBy === currentUser.username || p.status === '在库');
+}
+
+// Hide cost data from employees for products they didn't create
+function safeProduct(p) {
+  if (!currentUser || currentUser.role === 'admin') return p;
+  if (p.createdBy === currentUser.username) return p;
+  // For other people's in-stock items, hide cost/profit info
+  const safe = {...p};
+  safe.purchasePrice = 0;
+  safe.extraCost = 0;
+  safe.purchaseChannel = '';
+  safe._costHidden = true;
+  return safe;
 }
 
 // ====== Settings / Account Management ======
@@ -1769,8 +1782,11 @@ function renderInventory() {
     return;
   }
 
-  document.getElementById('inventory-list').innerHTML = filtered.map(p => {
+  document.getElementById('inventory-list').innerHTML = filtered.map(raw => {
+    const p = safeProduct(raw);
+    const isCostHidden = p._costHidden;
     const creatorTag = (currentUser && currentUser.role === 'admin' && p.createdBy) ? ` <span style="font-size:10px;color:var(--text-secondary)">@${p.createdBy}</span>` : '';
+    const priceDisplay = isCostHidden ? formatMoney(p.expectedPrice || 0) : (p.status==='已售' ? formatMoney(p.sellPrice) : formatMoney(p.purchasePrice));
     return `
     <div class="product-item-wrapper">
       <div class="product-item" onclick="showDetail('${p.id}')" ontouchstart="handleSwipeStart(event)" ontouchmove="handleSwipeMove(event,'${p.id}')" ontouchend="handleSwipeEnd(event)">
@@ -1780,7 +1796,7 @@ function renderInventory() {
           <div class="meta">${p.category} · ${p.condition} · ${formatDate(p.purchaseDate)}</div>
         </div>
         <div class="product-price">
-          <div class="price">${p.status==='已售' ? formatMoney(p.sellPrice) : formatMoney(p.purchasePrice)}</div>
+          <div class="price">${priceDisplay}${isCostHidden ? ' <span style="font-size:9px;color:var(--text-secondary)">售价</span>' : ''}</div>
           <div class="status-tag status-${p.status}">${p.status}</div>
         </div>
       </div>
@@ -1847,12 +1863,25 @@ document.addEventListener('click', function(e) {
 
 // ====== Product Detail ======
 function showDetail(id) {
-  const p = products.find(x => x.id === id);
-  if (!p) return;
+  const raw = products.find(x => x.id === id);
+  if (!raw) return;
+  const p = safeProduct(raw);
+  const isCostHidden = p._costHidden;
   document.getElementById('modal-detail-title').textContent = `${p.brand} ${p.model || ''}`;
   const totalCost = p.purchasePrice + (p.extraCost || 0);
   const profit = (p.status === '已售' || p.status === '代售') ? (p.sellPrice || 0) - totalCost : 0;
   const profitRate = (p.status === '已售' || p.status === '代售') && totalCost > 0 ? ((profit / totalCost) * 100).toFixed(1) : 0;
+
+  const costRows = isCostHidden ? '' : `
+    <div class="detail-row"><span class="label">购入价</span><span class="value" style="color:var(--warning)">${formatMoney(p.purchasePrice)}</span></div>
+    <div class="detail-row"><span class="label">额外成本</span><span class="value">${p.extraCost ? formatMoney(p.extraCost) : '-'}</span></div>
+    <div class="detail-row"><span class="label">总成本</span><span class="value" style="font-weight:700">${formatMoney(totalCost)}</span></div>
+  `;
+
+  const profitRows = isCostHidden ? '' : `
+    <div class="detail-row"><span class="label">售出价</span><span class="value" style="color:var(--success);font-weight:700">${formatMoney(p.sellPrice)}</span></div>
+    <div class="detail-row"><span class="label">利润</span><span class="value" style="color:${profit>=0?'var(--success)':'var(--danger)'};font-weight:700">${formatMoney(profit)} (${profitRate}%)</span></div>
+  `;
 
   document.getElementById('modal-detail-content').innerHTML = `
     <div class="detail-gallery" id="detail-gallery">
@@ -1883,13 +1912,10 @@ function showDetail(id) {
     <div class="detail-row"><span class="label">成色</span><span class="value">${p.condition}</span></div>
     <div class="detail-row"><span class="label">系列/型号</span><span class="value">${p.model || '-'}</span></div>
     <div class="detail-row"><span class="label">公价</span><span class="value">${p.publicPrice ? formatMoney(p.publicPrice) : '-'}</span></div>
-    <div class="detail-row"><span class="label">购入价</span><span class="value" style="color:var(--warning)">${formatMoney(p.purchasePrice)}</span></div>
-    <div class="detail-row"><span class="label">额外成本</span><span class="value">${p.extraCost ? formatMoney(p.extraCost) : '-'}</span></div>
-    <div class="detail-row"><span class="label">总成本</span><span class="value" style="font-weight:700">${formatMoney(totalCost)}</span></div>
-    <div class="detail-row"><span class="label">期望售价</span><span class="value">${p.expectedPrice ? formatMoney(p.expectedPrice) : '-'}</span></div>
+    ${costRows}
+    <div class="detail-row"><span class="label">期望售价</span><span class="value" style="font-weight:700">${p.expectedPrice ? formatMoney(p.expectedPrice) : '-'}</span></div>
     ${p.status === '已售' || p.status === '代售' ? `
-      <div class="detail-row"><span class="label">售出价</span><span class="value" style="color:var(--success);font-weight:700">${formatMoney(p.sellPrice)}</span></div>
-      <div class="detail-row"><span class="label">利润</span><span class="value" style="color:${profit>=0?'var(--success)':'var(--danger)'};font-weight:700">${formatMoney(profit)} (${profitRate}%)</span></div>
+      ${profitRows}
       <div class="detail-row"><span class="label">售出日期</span><span class="value">${formatDate(p.sellDate)}</span></div>
       <div class="detail-row"><span class="label">售出渠道</span><span class="value">${p.sellChannel || '-'}</span></div>
       <div class="detail-row"><span class="label">买家</span><span class="value">${p.buyer || '-'}</span></div>
@@ -1900,23 +1926,24 @@ function showDetail(id) {
     ` : ''}
     ${p.status === '代售' ? `
       <div class="detail-row"><span class="label">货主/同行</span><span class="value" style="color:#1976d2;font-weight:600">${p.supplier || '-'}</span></div>
-      <div class="detail-row"><span class="label">拿货价</span><span class="value">${formatMoney(p.purchasePrice)}</span></div>
+      ${!isCostHidden ? `<div class="detail-row"><span class="label">拿货价</span><span class="value">${formatMoney(p.purchasePrice)}</span></div>` : ''}
       <div class="detail-row"><span class="label">售出价</span><span class="value" style="color:var(--success);font-weight:700">${formatMoney(p.sellPrice)}</span></div>
-      <div class="detail-row"><span class="label">差价利润</span><span class="value" style="color:${((p.sellPrice||0)-p.purchasePrice)>=0?'var(--success)':'var(--danger)'};font-weight:700">${formatMoney((p.sellPrice||0)-p.purchasePrice)}</span></div>
+      ${!isCostHidden ? `<div class="detail-row"><span class="label">差价利润</span><span class="value" style="color:${((p.sellPrice||0)-p.purchasePrice)>=0?'var(--success)':'var(--danger)'};font-weight:700">${formatMoney((p.sellPrice||0)-p.purchasePrice)}</span></div>` : ''}
       <div class="detail-row"><span class="label">售出日期</span><span class="value">${formatDate(p.sellDate)}</span></div>
       <div class="detail-row"><span class="label">售出渠道</span><span class="value">${p.sellChannel || '-'}</span></div>
       <div class="detail-row"><span class="label">买家</span><span class="value">${p.buyer || '-'}</span></div>
       <div class="detail-row"><span class="label">物流单号</span><span class="value">${p.tracking || '-'}</span></div>
     ` : ''}
     <div class="detail-row"><span class="label">购入日期</span><span class="value">${formatDate(p.purchaseDate)}</span></div>
-    <div class="detail-row"><span class="label">购入渠道</span><span class="value">${p.purchaseChannel || '-'}</span></div>
+    ${!isCostHidden ? `<div class="detail-row"><span class="label">购入渠道</span><span class="value">${p.purchaseChannel || '-'}</span></div>` : ''}
     <div class="detail-row"><span class="label">存放位置</span><span class="value">${p.location || '-'}</span></div>
     <div class="detail-row"><span class="label">备注</span><span class="value">${p.notes || '-'}</span></div>
     ${p.createdBy ? `<div class="detail-row"><span class="label">录入人</span><span class="value" style="color:var(--accent)">@${p.createdBy}</span></div>` : ''}
+    ${isCostHidden ? '<div style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:8px">🔒 成本信息仅管理员可见</div>' : ''}
     <div style="display:flex;gap:8px;margin-top:16px">
       ${p.status === '在库' ? `<button class="btn btn-primary" style="flex:1" onclick="closeModal('modal-detail');quickSell('${p.id}')">💰 出售</button>` : ''}
-      ${p.status === '在库' ? `<button class="btn btn-outline" style="flex:1" onclick="closeModal('modal-detail');editProduct('${p.id}')">✏️ 编辑</button>` : ''}
-      <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')">🗑️ 删除</button>
+      ${p.status === '在库' && !isCostHidden ? `<button class="btn btn-outline" style="flex:1" onclick="closeModal('modal-detail');editProduct('${p.id}')">✏️ 编辑</button>` : ''}
+      ${!isCostHidden ? `<button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')">🗑️ 删除</button>` : ''}
     </div>
   `;
   document.getElementById('modal-detail').classList.add('active');
