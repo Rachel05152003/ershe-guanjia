@@ -233,6 +233,12 @@ input,select,textarea,button { font-family:inherit; font-size:14px; }
 .fab { position:fixed; right:16px; bottom:80px; width:50px; height:50px; border-radius:50%; background:var(--accent); color:#fff; border:none; font-size:22px; cursor:pointer; box-shadow:0 4px 12px rgba(201,169,110,.4); z-index:90; display:flex; align-items:center; justify-content:center; transition:transform .2s; }
 .fab:active { transform:scale(.9); }
 
+/* Role-based visibility */
+.admin-only-stat { display:none; }
+.employee-only-stat { display:none; }
+body.role-admin .admin-only-stat { display:flex; }
+body.role-employee .employee-only-stat { display:flex; }
+
 /* Desktop */
 @media(min-width:768px) {
   body { max-width:500px; margin:0 auto; box-shadow:0 0 20px rgba(0,0,0,.1); min-height:100vh; }
@@ -294,25 +300,34 @@ input,select,textarea,button { font-family:inherit; font-size:14px; }
       <div class="stat-label">在库商品</div>
       <div class="stat-value accent" id="stat-count">0</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card admin-only-stat">
       <div class="stat-label">库存总成本</div>
       <div class="stat-value warning" id="stat-cost">¥0</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card admin-only-stat">
       <div class="stat-label">累计销售额</div>
       <div class="stat-value success" id="stat-revenue">¥0</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card admin-only-stat">
       <div class="stat-label">本月销售额</div>
       <div class="stat-value accent" id="stat-month-revenue">¥0</div>
     </div>
-    <div class="stat-card">
+    <div class="stat-card admin-only-stat">
       <div class="stat-label">累计利润</div>
       <div class="stat-value" id="stat-profit">¥0</div>
     </div>
-    <div class="stat-card stat-full">
+    <div class="stat-card stat-full admin-only-stat">
       <div class="stat-label">本月利润</div>
       <div class="stat-value accent" id="stat-month-profit">¥0</div>
+    </div>
+    <!-- Employee-only stats -->
+    <div class="stat-card employee-only-stat">
+      <div class="stat-label">我录入的商品</div>
+      <div class="stat-value accent" id="stat-my-count">0</div>
+    </div>
+    <div class="stat-card stat-full employee-only-stat">
+      <div class="stat-label">可售商品</div>
+      <div class="stat-value success" id="stat-saleable">0</div>
     </div>
   </div>
 
@@ -770,27 +785,27 @@ input,select,textarea,button { font-family:inherit; font-size:14px; }
             <div class="stat-label">出库数量</div>
             <div class="stat-value success" id="rp-out-count">0</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card admin-only-stat">
             <div class="stat-label">购入成本</div>
             <div class="stat-value warning" id="rp-cost">¥0</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card admin-only-stat">
             <div class="stat-label">销售收入</div>
             <div class="stat-value accent" id="rp-revenue">¥0</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card admin-only-stat">
             <div class="stat-label">利润</div>
             <div class="stat-value" id="rp-profit">¥0</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card admin-only-stat">
             <div class="stat-label">利润率</div>
             <div class="stat-value" id="rp-margin">0%</div>
           </div>
-          <div class="stat-card stat-full">
+          <div class="stat-card stat-full admin-only-stat">
             <div class="stat-label">期末库存件数</div>
             <div class="stat-value accent" id="rp-stock-count">0</div>
           </div>
-          <div class="stat-card stat-full">
+          <div class="stat-card stat-full admin-only-stat">
             <div class="stat-label">期末库存总成本</div>
             <div class="stat-value warning" id="rp-stock-cost">¥0</div>
           </div>
@@ -1059,6 +1074,7 @@ function handleLogin() {
     saveAccounts();
     currentUser = { username, role };
     saveCurrentUser();
+    document.body.className = 'role-' + role;
     hideLogin();
     updateTopbarUser();
     initApp();
@@ -1072,6 +1088,7 @@ function handleLogin() {
     }
     currentUser = { username, role: acc.role };
     saveCurrentUser();
+    document.body.className = 'role-' + acc.role;
     hideLogin();
     updateTopbarUser();
     initApp();
@@ -1671,6 +1688,9 @@ function refreshDashboard() {
   const visible = getVisibleProducts();
   const inStock = visible.filter(p => p.status === '在库');
   const sold = visible.filter(p => p.status === '已售' || p.status === '代售');
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  // Admin stats
   const totalCost = inStock.reduce((s, p) => s + p.purchasePrice + (p.extraCost || 0), 0);
   const totalRevenue = sold.reduce((s, p) => s + (p.sellPrice || 0), 0);
   const totalCostSold = sold.reduce((s, p) => s + p.purchasePrice + (p.extraCost || 0), 0);
@@ -1691,12 +1711,21 @@ function refreshDashboard() {
   document.getElementById('stat-month-profit').textContent = formatMoney(monthProfit);
   document.getElementById('stat-month-profit').className = 'stat-value accent ' + (monthProfit >= 0 ? '' : '');
 
+  // Employee stats
+  const myProducts = currentUser ? visible.filter(p => p.createdBy === currentUser.username) : [];
+  const myCount = document.getElementById('stat-my-count');
+  const saleable = document.getElementById('stat-saleable');
+  if (myCount) myCount.textContent = myProducts.length;
+  if (saleable) saleable.textContent = inStock.length;
+
   // Recent activity
   const recent = [...visible].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).slice(0, 5);
   const recentHtml = recent.length === 0
     ? '<div class="empty-state"><div class="icon">📦</div><div class="text">暂无商品，点击"新增入库"开始</div></div>'
-    : recent.map(p => {
+    : recent.map(raw => {
+      const p = safeProduct(raw);
       const creatorTag = (currentUser && currentUser.role === 'admin' && p.createdBy) ? `<span style="font-size:10px;color:var(--text-secondary);margin-left:4px">@${p.createdBy}</span>` : '';
+      const priceDisplay = p._costHidden ? formatMoney(p.expectedPrice || 0) : (p.status==='已售' ? formatMoney(p.sellPrice) : formatMoney(p.purchasePrice));
       return `
       <div class="product-item" onclick="showDetail('${p.id}')">
         ${getProductThumb(p)}
@@ -1705,7 +1734,7 @@ function refreshDashboard() {
           <div class="meta">${p.category} · ${p.condition} · ${p.purchaseDate}</div>
         </div>
         <div class="product-price">
-          <div class="price">${p.status==='已售' ? formatMoney(p.sellPrice) : formatMoney(p.purchasePrice)}</div>
+          <div class="price">${priceDisplay}${p._costHidden ? ' <span style="font-size:9px;color:var(--text-secondary)">售价</span>' : ''}</div>
           <div class="status-tag status-${p.status}">${p.status}</div>
         </div>
       </div>
@@ -2768,8 +2797,11 @@ function initApp() {
 
 // Auth check on load
 initAuth();
-// If already logged in, init the app
-if (currentUser) initApp();
+// If already logged in, init the app and set role class
+if (currentUser) {
+  document.body.className = 'role-' + currentUser.role;
+  initApp();
+}
 // Auto pull from cloud on startup
 if (currentUser) autoCloudSync();
 
