@@ -1553,15 +1553,16 @@ async function cloudPullAndRetry() {
     // Merge: local data is ALWAYS priority (user just entered it)
     const cloudIds = new Set(cloudData.products.map(p => p.id));
     
-    // Start with cloud data, but smart merge images
+    // Start with cloud data, but smart merge
     const merged = cloudData.products.map(cp => {
       if (!cp.createdBy) cp.createdBy = '';
       const lp = localProducts.find(p => p.id === cp.id);
       if (lp) {
-        // Local version always wins if it was modified more recently
         const lpTime = new Date(lp.updatedAt || lp.createdAt || 0).getTime();
         const cpTime = new Date(cp.updatedAt || cp.createdAt || 0).getTime();
-        const winner = lpTime >= cpTime ? {...lp} : {...cp};
+        // Smart merge: if local has empty required fields but cloud has them, prefer cloud
+        const localHasEmptyKeyFields = !lp.brand && cp.brand || !lp.category && cp.category || !lp.condition && cp.condition;
+        const winner = (lpTime >= cpTime && !localHasEmptyKeyFields) ? {...lp} : {...cp};
         // Smart image merge
         const localImgs = localImageMap[winner.id] || [];
         const hasLocalBase64 = localImgs.some(img => img.startsWith('data:'));
@@ -1572,9 +1573,19 @@ async function cloudPullAndRetry() {
         } else {
           winner.images = localImgs;
         }
+        // Fill any empty fields from the other version
+        for (const key of Object.keys(winner)) {
+          if ((!winner[key] || winner[key] === '' || winner[key] === 0) && lp[key]) {
+            winner[key] = lp[key];
+          }
+        }
+        for (const key of Object.keys(cp)) {
+          if ((!winner[key] || winner[key] === '' || winner[key] === 0) && cp[key]) {
+            winner[key] = cp[key];
+          }
+        }
         return winner;
       }
-      // Cloud-only product - use cloud image URLs directly
       cp.images = cp.images || [];
       return cp;
     });
@@ -1723,17 +1734,29 @@ async function cloudPull(silent = false) {
       if (lp) {
         const lpTime = new Date(lp.updatedAt || lp.createdAt || 0).getTime();
         const cpTime = new Date(cp.updatedAt || cp.createdAt || 0).getTime();
-        const winner = lpTime >= cpTime ? {...lp} : {...cp};
+        // Smart merge: if local has empty required fields but cloud has them, prefer cloud
+        const localHasEmptyKeyFields = !lp.brand && cp.brand || !lp.category && cp.category || !lp.condition && cp.condition;
+        const winner = (lpTime >= cpTime && !localHasEmptyKeyFields) ? {...lp} : {...cp};
         // Smart image merge: keep local base64 if present, otherwise use cloud URLs
         const localImgs = localImageMap[winner.id] || [];
         const hasLocalBase64 = localImgs.some(img => img.startsWith('data:'));
         if (hasLocalBase64) {
           winner.images = localImgs;
         } else if (cp.images && cp.images.length > 0) {
-          // Use cloud image URLs (these are GitHub URLs, accessible from any device)
           winner.images = cp.images;
         } else {
           winner.images = localImgs;
+        }
+        // Fill any empty fields from the other version
+        for (const key of Object.keys(winner)) {
+          if ((!winner[key] || winner[key] === '' || winner[key] === 0) && lp[key]) {
+            winner[key] = lp[key];
+          }
+        }
+        for (const key of Object.keys(cp)) {
+          if ((!winner[key] || winner[key] === '' || winner[key] === 0) && cp[key]) {
+            winner[key] = cp[key];
+          }
         }
         return winner;
       }
