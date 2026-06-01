@@ -892,9 +892,10 @@ const GITHUB_API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/
 
 function save() {
   localStorage.setItem('luxe_products', JSON.stringify(products));
-  // Auto sync to cloud (debounced)
+  _dirtyPush = true; // Mark that we have local changes to push
+  // Auto sync to cloud (debounced, 3 seconds)
   clearTimeout(window._syncTimer);
-  window._syncTimer = setTimeout(() => cloudAutoSync(), 2000);
+  window._syncTimer = setTimeout(() => cloudAutoSync(), 3000);
 }
 
 // Migrate old products without createdBy
@@ -1225,25 +1226,13 @@ function doQuickAddEmployee() {
 }
 
 // ====== Cloud Sync (GitHub-based) ======
-async function githubRequest(method, body) {
-  const headers = {
-    'Authorization': `token ${GITHUB_TOKEN}`,
-    'Content-Type': 'application/json',
-    'Accept': 'application/vnd.github.v3+json'
-  };
-  const opts = { headers, method };
-  if (body) opts.body = JSON.stringify(body);
-  const resp = await fetch(GITHUB_API, opts);
-  if (resp.status === 404 || resp.status === 409) return null;
-  if (!resp.ok) throw new Error(`GitHub API ${resp.status}`);
-  return resp.json();
-}
+let _dirtyPush = false; // Track if we have unsaved local changes
 
-// Auto sync: push local changes to GitHub
 async function cloudAutoSync() {
   if (syncInProgress || !currentUser) return;
   try {
     syncInProgress = true;
+    _dirtyPush = false;
     const data = { products, accounts, updated: new Date().toISOString() };
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
     
@@ -1262,11 +1251,11 @@ async function cloudAutoSync() {
       cloudSha = result.content.sha;
       lastSyncTime = new Date().toISOString();
       localStorage.setItem('luxe_last_sync', lastSyncTime);
-      console.log('☁️ Auto sync success');
-    } else if (resp.status === 409 && cloudSha) {
-      // Conflict - pull first, then retry
-      console.log('☁️ Conflict detected, pulling...');
-      await cloudPull(true);
+      console.log('☁️ Push success');
+    } else if (resp.status === 409 || resp.status === 422) {
+      // Conflict - need to get latest SHA first, merge, then retry
+      console.log('☁️ Conflict, pulling then retrying push...');
+      await cloudPullAndRetry();
     }
   } catch(e) {
     console.error('Auto sync failed:', e);
@@ -1275,9 +1264,107 @@ async function cloudAutoSync() {
   }
 }
 
-// Pull from GitHub and merge
+// Pull cloud data, merge carefully, then push merged result
+async function cloudPullAndRetry() {
+  try {
+    const headers = {
+      'Authorization': `token ${GITHUB_TOKEN}`,
+      'Accept': 'application/vnd.github.v3+json'
+    };
+    
+    const resp = await fetch(GITHUB_API + '?t=' + Date.now(), { headers });
+    if (!resp.ok) return;
+    
+    const result = await resp.json();
+    cloudSha = result.sha;
+    
+    const text = decodeURIComponent(escape(atob(result.content)));
+    const cloudData = JSON.parse(text);
+    
+    if (!cloudData || !Array.isArray(cloudData.products)) return;
+    
+    // Save current local state before merge
+    const localProducts = [...products];
+    const localAccounts = [...accounts];
+    
+    // Merge: local data is ALWAYS priority (user just entered it)
+    const cloudIds = new Set(cloudData.products.map(p => p.id));
+    
+    // Start with cloud data
+    const merged = cloudData.products.map(cp => {
+      if (!cp.createdBy) cp.createdBy = '';
+      const lp = localProducts.find(p => p.id === cp.id);
+      if (lp) {
+        // Local version always wins if it was modified more recently
+        const lpTime = new Date(lp.updatedAt || lp.createdAt || 0).getTime();
+        const cpTime = new Date(cp.updatedAt || cp.createdAt || 0).getTime();
+        return lpTime >= cpTime ? lp : cp;
+      }
+      return cp;
+    });
+    
+    // Add local-only items (these are the new ones the user just added!)
+    localProducts.filter(p => !cloudIds.has(p.id)).forEach(p => merged.push(p));
+    
+    products = merged;
+    localStorage.setItem('luxe_products', JSON.stringify(products));
+    
+    // Merge accounts
+    if (cloudData.accounts && Array.isArray(cloudData.accounts)) {
+      const localNames = new Set(localAccounts.map(a => a.username));
+      cloudData.accounts.forEach(acc => {
+        if (!localNames.has(acc.username)) {
+          accounts.push(acc);
+          localNames.add(acc.username);
+        }
+      });
+      cloudData.accounts.forEach(cAcc => {
+        const lAcc = accounts.find(a => a.username === cAcc.username);
+        if (lAcc && cAcc.role) lAcc.role = cAcc.role;
+      });
+      saveAccounts();
+      
+      // Sync current user role
+      if (currentUser) {
+        const myAcc = accounts.find(a => a.username === currentUser.username);
+        if (myAcc && myAcc.role !== currentUser.role) {
+          currentUser.role = myAcc.role;
+          document.body.className = 'role-' + myAcc.role;
+          saveCurrentUser();
+          updateTopbarUser();
+        }
+      }
+    }
+    
+    // Now push the merged data
+    const pushData = { products, accounts, updated: new Date().toISOString() };
+    const pushContent = btoa(unescape(encodeURIComponent(JSON.stringify(pushData))));
+    const pushBody = { content: pushContent, sha: cloudSha, message: `合并同步 - ${new Date().toLocaleString('zh-CN')}` };
+    
+    const pushResp = await fetch(GITHUB_API, { method: 'PUT', headers, body: JSON.stringify(pushBody) });
+    if (pushResp.ok) {
+      const pushResult = await pushResp.json();
+      cloudSha = pushResult.content.sha;
+      lastSyncTime = new Date().toISOString();
+      localStorage.setItem('luxe_last_sync', lastSyncTime);
+      console.log('☁️ Merge + push success');
+    }
+    
+    refreshDashboard();
+    renderInventory();
+  } catch(err) {
+    console.error('Pull and retry failed:', err);
+  }
+}
+
+// Pull from GitHub and merge (only for manual pull or periodic sync)
 async function cloudPull(silent = false) {
   if (syncInProgress) return;
+  // If we have unsaved local changes, push first before pulling
+  if (_dirtyPush) {
+    await cloudAutoSync();
+    return;
+  }
   try {
     syncInProgress = true;
     const headers = {
@@ -1309,13 +1396,12 @@ async function cloudPull(silent = false) {
           localNames.add(acc.username);
         }
       });
-      // Also update existing accounts if cloud has newer data
       data.accounts.forEach(cAcc => {
         const lAcc = accounts.find(a => a.username === cAcc.username);
-        if (lAcc && cAcc.password) lAcc.password = cAcc.password;
         if (lAcc && cAcc.role) lAcc.role = cAcc.role;
       });
       saveAccounts();
+      
       // Sync current user's role in case admin changed it
       if (currentUser) {
         const myAcc = accounts.find(a => a.username === currentUser.username);
@@ -1329,7 +1415,7 @@ async function cloudPull(silent = false) {
       }
     }
     
-    // Merge products
+    // Merge products - local data has priority
     const cloudIds = new Set(data.products.map(p => p.id));
     const localOnly = products.filter(p => !cloudIds.has(p.id));
     const merged = data.products.map(cp => {
@@ -1345,7 +1431,7 @@ async function cloudPull(silent = false) {
     localOnly.forEach(p => merged.push(p));
     
     products = merged;
-    save();
+    localStorage.setItem('luxe_products', JSON.stringify(products));
     lastSyncTime = new Date().toISOString();
     localStorage.setItem('luxe_last_sync', lastSyncTime);
     refreshDashboard();
@@ -1370,10 +1456,10 @@ function autoCloudSync() {
   cloudPull();
 }
 
-// Periodic sync every 30 seconds
+// Periodic sync every 60 seconds (increased to reduce conflicts)
 setInterval(() => {
-  if (currentUser) cloudPull(true);
-}, 30000);
+  if (currentUser && !syncInProgress && !_dirtyPush) cloudPull(true);
+}, 60000);
 
 function showToast(msg) {
   const existing = document.getElementById('toast-msg');
@@ -1584,7 +1670,10 @@ function addProduct() {
   clearForm();
   switchPage('home');
   refreshDashboard();
-  showToast('✅ 入库成功！');
+  renderInventory();
+  // Vibration feedback on success
+  if (navigator.vibrate) navigator.vibrate(100);
+  showToast('✅ 入库成功！已保存1件商品');
 }
 
 function editProduct(id) {
