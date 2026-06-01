@@ -982,10 +982,12 @@ function saveCurrentUser() { localStorage.setItem('luxe_current_user', JSON.stri
 // ====== Auth & Multi-Account ======
 function initAuth() {
   if (currentUser) {
-    // Verify account still exists
+    // Verify account still exists and sync role from accounts list
     const acc = accounts.find(a => a.username === currentUser.username);
     if (acc) {
+      // Always sync role from master accounts list (in case admin changed it)
       currentUser.role = acc.role;
+      document.body.className = 'role-' + acc.role;
       saveCurrentUser();
       hideLogin();
       updateTopbarUser();
@@ -1382,6 +1384,17 @@ async function cloudPull(silent = false) {
         if (lAcc && cAcc.role) lAcc.role = cAcc.role;
       });
       saveAccounts();
+      // Sync current user's role in case admin changed it
+      if (currentUser) {
+        const myAcc = accounts.find(a => a.username === currentUser.username);
+        if (myAcc && myAcc.role !== currentUser.role) {
+          currentUser.role = myAcc.role;
+          document.body.className = 'role-' + myAcc.role;
+          saveCurrentUser();
+          updateTopbarUser();
+          refreshDashboard();
+        }
+      }
     }
     
     // Merge products
