@@ -1,0 +1,2727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>二奢管家 - 进销存管理</title>
+<style>
+:root {
+  --primary: #1a1a2e;
+  --accent: #c9a96e;
+  --accent-light: #e8d5b0;
+  --bg: #f5f3ef;
+  --card: #ffffff;
+  --text: #2d2d2d;
+  --text-secondary: #8a8a8a;
+  --danger: #e74c3c;
+  --success: #27ae60;
+  --warning: #f39c12;
+  --border: #e8e4de;
+  --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; background:var(--bg); color:var(--text); padding-bottom:70px; overflow-x:hidden; }
+input,select,textarea,button { font-family:inherit; font-size:14px; }
+
+/* Top Bar */
+.topbar { background:var(--primary); color:#fff; padding:16px 20px; position:sticky; top:0; z-index:100; }
+.topbar h1 { font-size:18px; font-weight:600; }
+.topbar .subtitle { font-size:12px; color:var(--accent-light); margin-top:2px; }
+
+/* Bottom Nav */
+.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#fff; display:flex; border-top:1px solid var(--border); z-index:100; padding-bottom:env(safe-area-inset-bottom); }
+.bottom-nav .nav-item { flex:1; text-align:center; padding:8px 0 6px; cursor:pointer; transition:color .2s; color:var(--text-secondary); }
+.bottom-nav .nav-item.active { color:var(--accent); }
+.bottom-nav .nav-item .icon { font-size:20px; display:block; }
+.bottom-nav .nav-item .label { font-size:10px; margin-top:2px; }
+
+/* Pages */
+.page { display:none; padding:16px; }
+.page.active { display:block; }
+
+/* Cards */
+.card { background:var(--card); border-radius:var(--radius); padding:16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.card-title { font-size:15px; font-weight:600; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; }
+
+/* Stats Grid */
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.stat-card { background:var(--card); border-radius:var(--radius); padding:14px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.stat-card .stat-label { font-size:12px; color:var(--text-secondary); }
+.stat-card .stat-value { font-size:22px; font-weight:700; margin-top:4px; }
+.stat-card .stat-value.accent { color:var(--accent); }
+.stat-card .stat-value.success { color:var(--success); }
+.stat-card .stat-value.danger { color:var(--danger); }
+.stat-card .stat-value.warning { color:var(--warning); }
+
+/* Full width stat */
+.stat-full { grid-column:1/-1; }
+
+/* Forms */
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:13px; color:var(--text-secondary); margin-bottom:6px; font-weight:500; }
+.form-group input, .form-group select, .form-group textarea { width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; background:#fff; font-size:14px; transition:border-color .2s; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:var(--accent); }
+.form-group textarea { resize:vertical; min-height:60px; }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+/* Buttons */
+.btn { display:inline-flex; align-items:center; justify-content:center; padding:10px 20px; border-radius:8px; border:none; cursor:pointer; font-size:14px; font-weight:500; transition:all .2s; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:active { opacity:.85; }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-outline { background:transparent; border:1.5px solid var(--accent); color:var(--accent); }
+.btn-block { width:100%; }
+.btn-sm { padding:6px 12px; font-size:12px; }
+.btn + .btn { margin-left:8px; }
+
+/* Search */
+.search-bar { display:flex; gap:8px; margin-bottom:12px; }
+.search-bar input { flex:1; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; }
+.search-bar input:focus { outline:none; border-color:var(--accent); }
+
+/* Filter tags */
+.filter-tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+.filter-tag { padding:5px 12px; border-radius:20px; font-size:12px; cursor:pointer; background:var(--card); border:1px solid var(--border); color:var(--text-secondary); transition:all .2s; }
+.filter-tag.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+/* Product List */
+.product-item { display:flex; align-items:center; padding:14px; background:var(--card); border-radius:var(--radius); margin-bottom:8px; box-shadow:0 1px 4px rgba(0,0,0,.06); cursor:pointer; transition:transform .15s; }
+.product-item:active { transform:scale(.98); }
+.product-icon { width:44px; height:44px; border-radius:10px; background:linear-gradient(135deg,var(--accent-light),var(--accent)); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; margin-right:12px; }
+.product-info { flex:1; min-width:0; }
+.product-info .name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.product-info .meta { font-size:12px; color:var(--text-secondary); margin-top:3px; }
+.product-price { text-align:right; flex-shrink:0; margin-left:10px; }
+.product-price .price { font-size:15px; font-weight:700; color:var(--accent); }
+.product-price .status-tag { font-size:11px; margin-top:3px; padding:2px 8px; border-radius:10px; }
+.status-在库 { background:#e8f5e9; color:var(--success); }
+.status-已售 { background:#fff3e0; color:var(--warning); }
+.status-退货 { background:#fce4ec; color:var(--danger); }
+.status-代售 { background:#e3f2fd; color:#1976d2; }
+
+/* Modal */
+.modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.5); z-index:200; align-items:flex-end; justify-content:center; }
+.modal-overlay.active { display:flex; }
+.modal { background:#fff; width:100%; max-width:500px; max-height:90vh; border-radius:16px 16px 0 0; overflow-y:auto; padding:20px; animation:slideUp .3s ease; }
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.modal-header h2 { font-size:17px; font-weight:600; }
+.modal-close { width:30px; height:30px; border:none; background:var(--bg); border-radius:50%; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; }
+
+/* Detail View */
+.detail-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); }
+.detail-row:last-child { border-bottom:none; }
+.detail-row .label { color:var(--text-secondary); font-size:13px; }
+.detail-row .value { font-weight:500; font-size:13px; text-align:right; max-width:60%; word-break:break-all; }
+
+/* Chart Container */
+.chart-container { position:relative; height:220px; margin:10px 0; }
+
+/* Empty State */
+.empty-state { text-align:center; padding:40px 20px; color:var(--text-secondary); }
+.empty-state .icon { font-size:48px; margin-bottom:12px; }
+.empty-state .text { font-size:14px; }
+
+/* Tabs */
+.tabs { display:flex; border-bottom:2px solid var(--border); margin-bottom:14px; }
+.tab { flex:1; text-align:center; padding:10px; font-size:13px; font-weight:500; color:var(--text-secondary); cursor:pointer; position:relative; transition:color .2s; }
+.tab.active { color:var(--accent); }
+.tab.active::after { content:''; position:absolute; bottom:-2px; left:20%; right:20%; height:2px; background:var(--accent); border-radius:1px; }
+
+/* Alert */
+.alert-list .alert-item { display:flex; align-items:center; padding:10px; background:#fff8f0; border-radius:8px; margin-bottom:6px; }
+.alert-item .alert-icon { margin-right:10px; font-size:16px; }
+.alert-item .alert-text { flex:1; font-size:13px; }
+.alert-item .alert-time { font-size:11px; color:var(--text-secondary); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+/* Toast animation */
+@keyframes fadeInOut { 0%{opacity:0;transform:translateX(-50%) translateY(-10px)} 15%{opacity:1;transform:translateX(-50%) translateY(0)} 80%{opacity:1} 100%{opacity:0} }
+
+/* Print */
+@media print { .bottom-nav,.topbar { display:none; } body { padding:0; } .page { display:block!important; } .btn { display:none!important; } .img-upload-area { display:none!important; } #tab-stats-report .card { break-inside:avoid; } }
+
+/* Image Upload */
+.img-upload-area { border:2px dashed var(--border); border-radius:10px; padding:20px; text-align:center; cursor:pointer; transition:all .2s; margin-bottom:12px; }
+.img-upload-area:hover { border-color:var(--accent); background:rgba(201,169,110,.05); }
+.img-upload-area .upload-icon { font-size:28px; margin-bottom:6px; }
+.img-upload-area .upload-text { font-size:13px; color:var(--text-secondary); }
+.img-preview-grid { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.img-preview-item { position:relative; width:72px; height:72px; border-radius:8px; overflow:hidden; }
+.img-preview-item img { width:100%; height:100%; object-fit:cover; }
+.img-preview-item .img-remove { position:absolute; top:2px; right:2px; width:20px; height:20px; background:rgba(0,0,0,.6); color:#fff; border-radius:50%; font-size:12px; display:flex; align-items:center; justify-content:center; cursor:pointer; line-height:1; }
+.img-preview-item .img-primary { position:absolute; bottom:2px; left:2px; padding:1px 5px; background:var(--accent); color:#fff; border-radius:4px; font-size:9px; }
+
+/* Product thumbnail in list */
+.product-thumb { width:50px; height:50px; border-radius:10px; overflow:hidden; flex-shrink:0; margin-right:12px; background:linear-gradient(135deg,var(--accent-light),var(--accent)); display:flex; align-items:center; justify-content:center; }
+.product-thumb img { width:100%; height:100%; object-fit:cover; }
+.product-thumb .thumb-icon { font-size:22px; }
+
+/* Detail image gallery */
+.detail-gallery { margin-bottom:16px; }
+.detail-gallery .gallery-main { width:100%; aspect-ratio:1; border-radius:12px; overflow:hidden; background:var(--bg); margin-bottom:8px; display:flex; align-items:center; justify-content:center; }
+.detail-gallery .gallery-main img { width:100%; height:100%; object-fit:contain; }
+.detail-gallery .gallery-main .gallery-placeholder { font-size:64px; }
+.detail-gallery .gallery-thumbs { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; }
+.detail-gallery .gallery-thumbs .thumb { width:56px; height:56px; border-radius:8px; overflow:hidden; flex-shrink:0; cursor:pointer; border:2px solid transparent; transition:border-color .2s; }
+.detail-gallery .gallery-thumbs .thumb.active { border-color:var(--accent); }
+.detail-gallery .gallery-thumbs .thumb img { width:100%; height:100%; object-fit:cover; }
+
+/* Image viewer overlay */
+.img-viewer { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.95); z-index:300; align-items:center; justify-content:center; flex-direction:column; }
+.img-viewer.active { display:flex; }
+.img-viewer img { max-width:95%; max-height:80vh; object-fit:contain; border-radius:8px; }
+.img-viewer .viewer-close { position:absolute; top:16px; right:16px; width:36px; height:36px; background:rgba(255,255,255,.2); border:none; border-radius:50%; color:#fff; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.img-viewer .viewer-nav { position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px; background:rgba(255,255,255,.15); border:none; border-radius:50%; color:#fff; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.img-viewer .viewer-nav:hover { background:rgba(255,255,255,.3); }
+.img-viewer .viewer-prev { left:12px; }
+.img-viewer .viewer-next { right:12px; }
+.img-viewer .viewer-counter { color:rgba(255,255,255,.7); font-size:13px; margin-top:12px; }
+
+/* Login Page */
+.login-page { position:fixed; top:0; left:0; right:0; bottom:0; background:var(--primary); z-index:999; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:24px; }
+.login-page.hidden { display:none; }
+.login-box { background:#fff; border-radius:16px; padding:28px 24px; width:100%; max-width:360px; }
+.login-box h2 { text-align:center; font-size:20px; margin-bottom:6px; }
+.login-box .login-sub { text-align:center; font-size:13px; color:var(--text-secondary); margin-bottom:20px; }
+.login-box .form-group { margin-bottom:14px; }
+.login-box .form-group label { display:block; font-size:13px; color:var(--text-secondary); margin-bottom:6px; }
+.login-box .form-group input { width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:8px; font-size:15px; }
+.login-box .form-group input:focus { outline:none; border-color:var(--accent); }
+.login-box .btn { width:100%; padding:12px; font-size:15px; margin-top:4px; }
+.login-logo { font-size:56px; margin-bottom:16px; }
+.login-title { color:#fff; font-size:22px; font-weight:600; margin-bottom:4px; }
+.login-desc { color:var(--accent-light); font-size:13px; margin-bottom:28px; }
+.login-switch { text-align:center; margin-top:12px; font-size:13px; color:var(--text-secondary); }
+.login-switch a { color:var(--accent); cursor:pointer; text-decoration:underline; }
+.login-error { color:var(--danger); font-size:12px; text-align:center; margin-top:8px; min-height:18px; }
+
+/* Account Management */
+.account-item { display:flex; align-items:center; padding:12px 0; border-bottom:1px solid var(--border); }
+.account-item:last-child { border-bottom:none; }
+.account-avatar { width:40px; height:40px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:600; flex-shrink:0; margin-right:12px; }
+.account-info { flex:1; }
+.account-info .name { font-size:14px; font-weight:600; }
+.account-info .role { font-size:12px; color:var(--text-secondary); }
+.account-info .time { font-size:11px; color:var(--text-secondary); }
+.account-actions { display:flex; gap:6px; }
+
+/* Topbar user */
+.topbar { display:flex; justify-content:space-between; align-items:center; }
+.topbar-right { display:flex; align-items:center; gap:8px; }
+.topbar-user { font-size:12px; color:var(--accent-light); display:flex; align-items:center; gap:4px; cursor:pointer; padding:4px 10px; border-radius:20px; background:rgba(255,255,255,.1); }
+.topbar-user:active { background:rgba(255,255,255,.2); }
+.role-badge { font-size:10px; padding:1px 6px; border-radius:8px; margin-left:4px; }
+.role-admin { background:var(--accent); color:#fff; }
+.role-employee { background:#e3f2fd; color:#1976d2; }
+
+/* Settings Modal */
+.settings-section { margin-bottom:16px; }
+.settings-section h3 { font-size:14px; font-weight:600; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+
+/* Swipe to delete */
+.product-item-wrapper { position:relative; overflow:hidden; margin-bottom:8px; border-radius:var(--radius); }
+.product-item { position:relative; z-index:2; background:var(--card); box-shadow:0 1px 4px rgba(0,0,0,.06); transition:transform .2s ease; margin-bottom:0; border-radius:var(--radius); }
+.product-item.swiped { transform:translateX(-70px); }
+.swipe-delete { position:absolute; right:0; top:0; bottom:0; width:70px; background:var(--danger); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; z-index:1; cursor:pointer; border-radius:0 var(--radius) var(--radius) 0; }
+.swipe-delete:active { background:#c0392b; }
+
+/* Quick action floating button */
+.fab { position:fixed; right:16px; bottom:80px; width:50px; height:50px; border-radius:50%; background:var(--accent); color:#fff; border:none; font-size:22px; cursor:pointer; box-shadow:0 4px 12px rgba(201,169,110,.4); z-index:90; display:flex; align-items:center; justify-content:center; transition:transform .2s; }
+.fab:active { transform:scale(.9); }
+
+/* Desktop */
+@media(min-width:768px) {
+  body { max-width:500px; margin:0 auto; box-shadow:0 0 20px rgba(0,0,0,.1); min-height:100vh; }
+}
+</style>
+</head>
+<body>
+
+<!-- Login Page -->
+<div class="login-page" id="login-page">
+  <div class="login-logo">👜</div>
+  <div class="login-title">二奢管家</div>
+  <div class="login-desc">二手奢侈品进销存管理</div>
+  <div class="login-box">
+    <h2 id="login-heading">登录账号</h2>
+    <div class="login-sub" id="login-sub">首次使用请先注册管理员账号</div>
+    <div class="form-group">
+      <label>用户名</label>
+      <input type="text" id="login-username" placeholder="输入用户名" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" id="login-password" placeholder="输入密码" autocomplete="current-password" onkeydown="if(event.key==='Enter')handleLogin()">
+    </div>
+    <div class="form-group" id="login-role-group" style="display:none">
+      <label>角色</label>
+      <select id="login-role">
+        <option value="admin">管理员（查看所有数据）</option>
+        <option value="employee">员工（仅查看自己的数据）</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" id="login-btn" onclick="handleLogin()">登录</button>
+    <div class="login-error" id="login-error"></div>
+    <div class="login-switch" id="login-switch">
+      还没有账号？<a onclick="toggleLoginMode()">注册新账号</a>
+    </div>
+  </div>
+</div>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div>
+    <h1>👜 二奢管家</h1>
+    <div class="subtitle" id="topbar-subtitle">个人进销存管理</div>
+  </div>
+  <div class="topbar-right">
+    <div class="topbar-user" onclick="showSettings()" id="topbar-user">
+      <span>👤</span>
+      <span id="topbar-username">-</span>
+      <span class="role-badge role-admin" id="topbar-role">管理员</span>
+    </div>
+  </div>
+</div>
+
+<!-- Page: Dashboard -->
+<div class="page active" id="page-home">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">在库商品</div>
+      <div class="stat-value accent" id="stat-count">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">库存总成本</div>
+      <div class="stat-value warning" id="stat-cost">¥0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">累计销售额</div>
+      <div class="stat-value success" id="stat-revenue">¥0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">本月销售额</div>
+      <div class="stat-value accent" id="stat-month-revenue">¥0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">累计利润</div>
+      <div class="stat-value" id="stat-profit">¥0</div>
+    </div>
+    <div class="stat-card stat-full">
+      <div class="stat-label">本月利润</div>
+      <div class="stat-value accent" id="stat-month-profit">¥0</div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="card">
+    <div class="card-title">快捷操作</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="showAddProduct()">📦 新增入库</button>
+      <button class="btn btn-outline" onclick="showProxySale()">🤝 不在库开单</button>
+      <button class="btn btn-outline" onclick="switchPage('inventory')">📋 查看库存</button>
+      <button class="btn btn-outline" onclick="switchPage('stats')">📊 统计报表</button>
+    </div>
+  </div>
+
+  <!-- Recent Activity -->
+  <div class="card">
+    <div class="card-title">最近动态 <span style="font-size:12px;color:var(--text-secondary);font-weight:400" id="recent-count"></span></div>
+    <div id="recent-list"></div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="card" id="alert-section" style="display:none">
+    <div class="card-title">⏰ 库存预警</div>
+    <div class="alert-list" id="alert-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">☁️ 云端同步 <span style="font-size:11px;color:var(--text-secondary);font-weight:400" id="sync-time"></span></div>
+    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">多设备共享数据，换手机也能继续用</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary btn-sm" onclick="cloudPull()" style="flex:1">⬇️ 从云端拉取</button>
+      <button class="btn btn-outline btn-sm" onclick="cloudPush()" style="flex:1">⬆️ 推送到云端</button>
+    </div>
+  </div>
+
+  <!-- Team Card (Admin only) -->
+  <div class="card" id="team-card" style="display:none">
+    <div class="card-title">👥 团队管理</div>
+    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px" id="team-summary"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="quickAddEmployee()">➕ 添加员工</button>
+      <button class="btn btn-outline btn-sm" onclick="showSettings()">⚙️ 管理账号</button>
+    </div>
+  </div>
+</div>
+
+<!-- Page: Add Product -->
+<div class="page" id="page-add">
+  <div class="card">
+    <div class="card-title">📦 商品入库</div>
+    <div class="form-group">
+      <label>商品图片</label>
+      <div class="img-preview-grid" id="img-preview-grid"></div>
+      <div class="img-upload-area" onclick="document.getElementById('img-input').click()">
+        <div class="upload-icon">📷</div>
+        <div class="upload-text">点击拍照或选择图片（最多6张）</div>
+      </div>
+      <input type="file" id="img-input" accept="image/*" multiple style="display:none" onchange="handleImageUpload(event)">
+    </div>
+    <div class="form-group">
+      <label>品牌 *</label>
+      <input type="text" id="f-brand" placeholder="如：LV、Rolex、Chanel" list="brand-list">
+      <datalist id="brand-list">
+        <option value="Louis Vuitton"><option value="Rolex"><option value="Chanel"><option value="Hermès"><option value="Gucci"><option value="Dior"><option value="Prada"><option value="Cartier"><option value="Omega"><option value="Burberry"><option value="Celine"><option value="Fendi"><option value="Balenciaga"><option value="Bottega Veneta"><option value="Tiffany"><option value="Bvlgari">
+      </datalist>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>分类 *</label>
+        <select id="f-category">
+          <option value="">请选择</option>
+          <option value="腕表">腕表</option>
+          <option value="箱包">箱包</option>
+          <option value="珠宝">珠宝</option>
+          <option value="服饰">服饰</option>
+          <option value="鞋靴">鞋靴</option>
+          <option value="配饰">配饰</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>成色 *</label>
+        <select id="f-condition">
+          <option value="">请选择</option>
+          <option value="全新">全新</option>
+          <option value="99新">99新</option>
+          <option value="95新">95新</option>
+          <option value="9成新">9成新</option>
+          <option value="85新">85新</option>
+          <option value="8成新及以下">8成新及以下</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>系列/型号</label>
+      <input type="text" id="f-model" placeholder="如：Speedy 25 / Submariner 116610LN">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>购入价 *</label>
+        <input type="number" id="f-purchasePrice" placeholder="0.00" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>公价（参考）</label>
+        <input type="number" id="f-publicPrice" placeholder="0.00" step="0.01">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>期望售价</label>
+        <input type="number" id="f-expectedPrice" placeholder="0.00" step="0.01">
+      </div>
+      <div class="form-group">
+        <label>额外成本</label>
+        <input type="number" id="f-extraCost" placeholder="维修/鉴定等" step="0.01">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>购入日期</label>
+        <input type="date" id="f-purchaseDate">
+      </div>
+      <div class="form-group">
+        <label>购入渠道</label>
+        <select id="f-purchaseChannel">
+          <option value="">请选择</option>
+          <option value="同行调货">同行调货</option>
+          <option value="线上展会">线上展会</option>
+          <option value="上门回收">上门回收</option>
+          <option value="客户寄卖">客户寄卖</option>
+          <option value="闲鱼">闲鱼</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>存放位置</label>
+      <input type="text" id="f-location" placeholder="如：A柜-3层 / 仓库B">
+    </div>
+    <div class="form-group">
+      <label>备注</label>
+      <textarea id="f-notes" placeholder="配件情况、鉴定结果等"></textarea>
+    </div>
+    <button class="btn btn-primary btn-block" onclick="addProduct()" id="btn-add" style="margin-top:8px">确认入库</button>
+    <button class="btn btn-outline btn-block" onclick="cancelEdit()" id="btn-cancel" style="display:none;margin-top:8px">取消编辑</button>
+  </div>
+</div>
+
+<!-- Page: Inventory -->
+<div class="page" id="page-inventory">
+  <div class="search-bar">
+    <input type="text" id="search-input" placeholder="搜索品牌、型号..." oninput="renderInventory()">
+  </div>
+  <div class="filter-tags" id="filter-tags">
+    <span class="filter-tag active" data-filter="全部" onclick="setFilter(this)">全部</span>
+    <span class="filter-tag" data-filter="在库" onclick="setFilter(this)">在库</span>
+    <span class="filter-tag" data-filter="已售" onclick="setFilter(this)">已售</span>
+    <span class="filter-tag" data-filter="退货" onclick="setFilter(this)">退货</span>
+    <span class="filter-tag" data-filter="代售" onclick="setFilter(this)">代售</span>
+    <span class="filter-tag" data-filter="腕表" onclick="setFilter(this)">腕表</span>
+    <span class="filter-tag" data-filter="箱包" onclick="setFilter(this)">箱包</span>
+    <span class="filter-tag" data-filter="珠宝" onclick="setFilter(this)">珠宝</span>
+  </div>
+  <div id="inventory-list"></div>
+  <div style="text-align:center;margin-top:12px;">
+    <button class="btn btn-sm btn-outline" onclick="exportData()">📥 导出数据</button>
+    <button class="btn btn-sm btn-outline" onclick="document.getElementById('import-file').click()">📤 导入数据</button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+  </div>
+</div>
+
+<!-- Page: Sales -->
+<div class="page" id="page-sales">
+  <div class="tabs">
+    <div class="tab active" onclick="switchSalesTab(this,'sales-record')">录入销售</div>
+    <div class="tab" onclick="switchSalesTab(this,'sales-proxy')">不在库开单</div>
+    <div class="tab" onclick="switchSalesTab(this,'sales-history')">销售记录</div>
+  </div>
+
+  <!-- Sales Record Form -->
+  <div id="tab-sales-record">
+    <div class="card">
+      <div class="card-title">💰 录入销售</div>
+      <div class="form-group">
+        <label>选择商品 *</label>
+        <select id="s-product">
+          <option value="">请选择在库商品</option>
+        </select>
+      </div>
+      <div id="sale-product-info" style="display:none" class="card" >
+        <div id="sale-info-content" style="font-size:13px;color:var(--text-secondary)"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>售出价 *</label>
+          <input type="number" id="s-price" placeholder="0.00" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>售出日期</label>
+          <input type="date" id="s-date">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>售出渠道</label>
+          <select id="s-channel">
+            <option value="">请选择</option>
+            <option value="微信">微信</option>
+            <option value="闲鱼">闲鱼</option>
+            <option value="抖音">抖音</option>
+            <option value="小红书">小红书</option>
+            <option value="线下">线下</option>
+            <option value="95分">95分</option>
+            <option value="同行">同行</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>买家</label>
+          <input type="text" id="s-buyer" placeholder="客户名称/备注">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>物流单号</label>
+        <input type="text" id="s-tracking" placeholder="快递单号">
+      </div>
+      <button class="btn btn-primary btn-block" onclick="recordSale()" style="margin-top:8px">确认出售</button>
+    </div>
+
+    <!-- Quick Return -->
+    <div class="card">
+      <div class="card-title">🔄 退货登记</div>
+      <div class="form-group">
+        <label>选择已售商品 *</label>
+        <select id="r-product">
+          <option value="">请选择</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>退货原因</label>
+        <input type="text" id="r-reason" placeholder="如：鉴定不通过、客户退货">
+      </div>
+      <button class="btn btn-danger btn-block" onclick="recordReturn()">确认退货</button>
+    </div>
+  </div>
+
+  <!-- Proxy Sale (Off-inventory Order) -->
+  <div id="tab-sales-proxy" style="display:none">
+    <div class="card">
+      <div class="card-title">🤝 不在库开单</div>
+      <div style="font-size:12px;color:var(--accent);margin-bottom:12px;padding:8px;background:rgba(201,169,110,.08);border-radius:8px">
+        非自有货品，帮同行/货源方代售，赚取差价利润
+      </div>
+      <div class="form-group">
+        <label>品牌 *</label>
+        <input type="text" id="p-brand" placeholder="如：LV、Rolex、Chanel" list="brand-list">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>分类 *</label>
+          <select id="p-category">
+            <option value="">请选择</option>
+            <option value="腕表">腕表</option>
+            <option value="箱包">箱包</option>
+            <option value="珠宝">珠宝</option>
+            <option value="服饰">服饰</option>
+            <option value="鞋靴">鞋靴</option>
+            <option value="配饰">配饰</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>成色</label>
+          <select id="p-condition">
+            <option value="">请选择</option>
+            <option value="全新">全新</option>
+            <option value="99新">99新</option>
+            <option value="95新">95新</option>
+            <option value="9成新">9成新</option>
+            <option value="85新">85新</option>
+            <option value="8成新及以下">8成新及以下</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>系列/型号</label>
+        <input type="text" id="p-model" placeholder="如：Speedy 25 / Submariner 116610LN">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>拿货价（给同行的）*</label>
+          <input type="number" id="p-costPrice" placeholder="同行结算价" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>售出价 *</label>
+          <input type="number" id="p-sellPrice" placeholder="卖给客户的价格" step="0.01">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>货主/同行来源 *</label>
+        <input type="text" id="p-supplier" placeholder="货是谁的（同行名称）">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>开单日期</label>
+          <input type="date" id="p-date">
+        </div>
+        <div class="form-group">
+          <label>售出渠道</label>
+          <select id="p-channel">
+            <option value="">请选择</option>
+            <option value="微信">微信</option>
+            <option value="闲鱼">闲鱼</option>
+            <option value="抖音">抖音</option>
+            <option value="小红书">小红书</option>
+            <option value="线下">线下</option>
+            <option value="95分">95分</option>
+            <option value="同行">同行</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>买家</label>
+          <input type="text" id="p-buyer" placeholder="客户名称/备注">
+        </div>
+        <div class="form-group">
+          <label>物流单号</label>
+          <input type="text" id="p-tracking" placeholder="快递单号">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>备注</label>
+        <textarea id="p-notes" placeholder="其他信息"></textarea>
+      </div>
+      <!-- Preview profit -->
+      <div id="proxy-profit-preview" style="display:none;padding:10px;margin-bottom:10px;background:rgba(39,174,96,.08);border-radius:8px;font-size:14px;text-align:center">
+        <span style="color:var(--text-secondary)">预计利润：</span>
+        <span id="proxy-profit-value" style="font-weight:700;font-size:18px">¥0</span>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="recordProxySale()">确认开单</button>
+    </div>
+  </div>
+
+  <!-- Sales History -->
+  <div id="tab-sales-history" style="display:none">
+    <div id="sales-history-list"></div>
+  </div>
+</div>
+
+<!-- Page: Stats -->
+<div class="page" id="page-stats">
+  <div class="tabs">
+    <div class="tab active" onclick="switchStatsTab(this,'stats-overview')">经营概览</div>
+    <div class="tab" onclick="switchStatsTab(this,'stats-category')">分类统计</div>
+    <div class="tab" onclick="switchStatsTab(this,'stats-trend')">趋势分析</div>
+    <div class="tab" onclick="switchStatsTab(this,'stats-report')">报表中心</div>
+  </div>
+
+  <!-- Overview -->
+  <div id="tab-stats-overview">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">总入库数</div>
+        <div class="stat-value" id="st-total-in">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">总出库数</div>
+        <div class="stat-value success" id="st-total-out">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">库存总值(售价)</div>
+        <div class="stat-value accent" id="st-inventory-value">¥0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">平均利润率</div>
+        <div class="stat-value warning" id="st-avg-margin">0%</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📊 品牌利润排行</div>
+      <div id="brand-profit-table"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🏆 畅销品类</div>
+      <div id="top-category"></div>
+    </div>
+  </div>
+
+  <!-- Category -->
+  <div id="tab-stats-category" style="display:none">
+    <div class="card">
+      <div class="card-title">分类库存分布</div>
+      <canvas id="chart-category" width="400" height="220"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">分类销售额</div>
+      <canvas id="chart-category-sales" width="400" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- Trend -->
+  <div id="tab-stats-trend" style="display:none">
+    <div class="card">
+      <div class="card-title">月度利润趋势</div>
+      <canvas id="chart-trend" width="400" height="220"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">月度进出库</div>
+      <canvas id="chart-inout" width="400" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- Report Center -->
+  <div id="tab-stats-report" style="display:none">
+    <!-- Month Selector -->
+    <div class="card">
+      <div class="card-title">📅 报表周期</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-primary btn-sm" id="btn-report-month" onclick="switchReportMode('month')">月度报表</button>
+        <button class="btn btn-outline btn-sm" id="btn-report-year" onclick="switchReportMode('year')">年度报表</button>
+      </div>
+      <div class="form-row">
+        <div class="form-group" id="report-year-group">
+          <label>年份</label>
+          <select id="report-year"></select>
+        </div>
+        <div class="form-group" id="report-month-group">
+          <label>月份</label>
+          <select id="report-month">
+            <option value="01">1月</option><option value="02">2月</option><option value="03">3月</option>
+            <option value="04">4月</option><option value="05">5月</option><option value="06">6月</option>
+            <option value="07">7月</option><option value="08">8月</option><option value="09">9月</option>
+            <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="generateReport()" style="margin-top:4px">生成报表</button>
+    </div>
+
+    <!-- Report Content -->
+    <div id="report-content" style="display:none">
+      <div class="card">
+        <div class="card-title" id="report-title">📊 月度报表</div>
+        <!-- Core Metrics -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">入库数量</div>
+            <div class="stat-value" id="rp-in-count">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">出库数量</div>
+            <div class="stat-value success" id="rp-out-count">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">购入成本</div>
+            <div class="stat-value warning" id="rp-cost">¥0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">销售收入</div>
+            <div class="stat-value accent" id="rp-revenue">¥0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">利润</div>
+            <div class="stat-value" id="rp-profit">¥0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">利润率</div>
+            <div class="stat-value" id="rp-margin">0%</div>
+          </div>
+          <div class="stat-card stat-full">
+            <div class="stat-label">期末库存件数</div>
+            <div class="stat-value accent" id="rp-stock-count">0</div>
+          </div>
+          <div class="stat-card stat-full">
+            <div class="stat-label">期末库存总成本</div>
+            <div class="stat-value warning" id="rp-stock-cost">¥0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel Breakdown -->
+      <div class="card">
+        <div class="card-title">📈 销售渠道分布</div>
+        <div id="rp-channel-table"></div>
+      </div>
+
+      <!-- Brand Breakdown -->
+      <div class="card">
+        <div class="card-title">🏷️ 品牌明细</div>
+        <div id="rp-brand-table"></div>
+      </div>
+
+      <!-- Category Breakdown -->
+      <div class="card">
+        <div class="card-title">📂 品类明细</div>
+        <div id="rp-category-table"></div>
+      </div>
+
+      <!-- Monthly Breakdown (only for annual) -->
+      <div class="card" id="rp-monthly-section" style="display:none">
+        <div class="card-title">📆 逐月明细</div>
+        <canvas id="chart-report-monthly" width="400" height="250"></canvas>
+        <div id="rp-monthly-table"></div>
+      </div>
+
+      <!-- Top 5 deals -->
+      <div class="card">
+        <div class="card-title">🏆 利润TOP5</div>
+        <div id="rp-top-deals"></div>
+      </div>
+
+      <!-- Action buttons -->
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-outline" style="flex:1" onclick="printReport()">🖨️ 打印报表</button>
+        <button class="btn btn-primary" style="flex:1" onclick="shareReport()">📤 分享报表</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stocktake -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-title">📋 库存盘点</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">快速核对在库商品</div>
+    <div id="stocktake-list"></div>
+    <button class="btn btn-primary btn-block" onclick="startStocktake()" style="margin-top:10px">开始盘点</button>
+  </div>
+
+  <!-- Alerts -->
+  <div class="card">
+    <div class="card-title">⏰ 滞销预警（入库超90天未售）</div>
+    <div id="stale-alert-list"></div>
+  </div>
+</div>
+
+<!-- Product Detail Modal -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-detail-title">商品详情</h2>
+      <button class="modal-close" onclick="closeModal('modal-detail')">✕</button>
+    </div>
+    <div id="modal-detail-content"></div>
+  </div>
+</div>
+
+<!-- Stocktake Modal -->
+<div class="modal-overlay" id="modal-stocktake">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>📋 盘点中</h2>
+      <button class="modal-close" onclick="closeModal('modal-stocktake')">✕</button>
+    </div>
+    <div id="stocktake-modal-content"></div>
+    <button class="btn btn-primary btn-block" onclick="finishStocktake()" style="margin-top:12px">完成盘点</button>
+  </div>
+</div>
+
+<!-- Image Viewer -->
+<div class="img-viewer" id="img-viewer">
+  <button class="viewer-close" onclick="closeImageViewer()">✕</button>
+  <button class="viewer-nav viewer-prev" onclick="viewerNav(-1)">‹</button>
+  <button class="viewer-nav viewer-next" onclick="viewerNav(1)">›</button>
+  <img id="viewer-img" src="" alt="">
+  <div class="viewer-counter" id="viewer-counter"></div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="modal-settings">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>⚙️ 账号与设置</h2>
+      <button class="modal-close" onclick="closeModal('modal-settings')">✕</button>
+    </div>
+    <div id="settings-content"></div>
+  </div>
+</div>
+
+<!-- Quick Add Employee Modal -->
+<div class="modal-overlay" id="modal-add-employee">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>➕ 快速添加员工</h2>
+      <button class="modal-close" onclick="closeModal('modal-add-employee')">✕</button>
+    </div>
+    <div class="form-group">
+      <label>员工用户名</label>
+      <input type="text" id="qae-username" placeholder="如：小王">
+    </div>
+    <div class="form-group">
+      <label>初始密码</label>
+      <input type="text" id="qae-password" placeholder="如：1234" value="1234">
+    </div>
+    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;padding:8px;background:rgba(201,169,110,.08);border-radius:8px">
+      💡 员工首次登录后会自行修改密码。默认密码1234，请提醒员工登录后及时修改。
+    </div>
+    <button class="btn btn-primary btn-block" onclick="doQuickAddEmployee()">确认添加</button>
+  </div>
+</div>
+
+<script>
+// ====== Data Layer ======
+const CLOUD_URL = 'https://www.coze.cn/s/FvcsdpE4hQE/';
+let products = JSON.parse(localStorage.getItem('luxe_products') || '[]');
+let accounts = JSON.parse(localStorage.getItem('luxe_accounts') || '[]');
+let currentUser = JSON.parse(localStorage.getItem('luxe_current_user') || 'null');
+let stocktakeState = {};
+let currentFilter = '全部';
+let editingId = null;
+let tempImages = [];
+let viewerImages = [];
+let viewerIndex = 0;
+let lastSyncTime = localStorage.getItem('luxe_last_sync') || '';
+let loginMode = 'login'; // 'login' or 'register'
+
+function save() { localStorage.setItem('luxe_products', JSON.stringify(products)); }
+
+// Migrate old products without createdBy
+function migrateProducts() {
+  let changed = false;
+  products.forEach(p => {
+    if (!p.createdBy) {
+      p.createdBy = currentUser ? currentUser.username : '';
+      changed = true;
+    }
+  });
+  if (changed) save();
+}
+function saveAccounts() { localStorage.setItem('luxe_accounts', JSON.stringify(accounts)); }
+function saveCurrentUser() { localStorage.setItem('luxe_current_user', JSON.stringify(currentUser)); }
+
+// ====== Auth & Multi-Account ======
+function initAuth() {
+  if (currentUser) {
+    // Verify account still exists
+    const acc = accounts.find(a => a.username === currentUser.username);
+    if (acc) {
+      currentUser.role = acc.role;
+      saveCurrentUser();
+      hideLogin();
+      updateTopbarUser();
+      return;
+    } else {
+      currentUser = null;
+      saveCurrentUser();
+    }
+  }
+  // No valid session - show login
+  showLogin();
+}
+
+function showLogin() {
+  document.getElementById('login-page').classList.remove('hidden');
+  // If no accounts exist, default to register mode
+  if (accounts.length === 0) {
+    loginMode = 'register';
+    updateLoginUI();
+  }
+}
+
+function hideLogin() {
+  document.getElementById('login-page').classList.add('hidden');
+}
+
+function updateLoginUI() {
+  const heading = document.getElementById('login-heading');
+  const sub = document.getElementById('login-sub');
+  const btn = document.getElementById('login-btn');
+  const switchEl = document.getElementById('login-switch');
+  const roleGroup = document.getElementById('login-role-group');
+
+  if (loginMode === 'login') {
+    heading.textContent = '登录账号';
+    sub.textContent = accounts.length === 0 ? '首次使用请先注册管理员账号' : '输入账号密码登录';
+    btn.textContent = '登录';
+    switchEl.innerHTML = '还没有账号？<a onclick="toggleLoginMode()">注册新账号</a>';
+    roleGroup.style.display = 'none';
+  } else {
+    heading.textContent = '注册新账号';
+    sub.textContent = accounts.length === 0 ? '第一个注册的账号自动成为管理员' : '注册后由管理员审核分配角色';
+    btn.textContent = '注册';
+    switchEl.innerHTML = '已有账号？<a onclick="toggleLoginMode()">去登录</a>';
+    // Only show role selector if admin is already set up
+    if (accounts.length > 0) {
+      roleGroup.style.display = '';
+      document.getElementById('login-role').value = 'employee';
+    } else {
+      roleGroup.style.display = 'none';
+    }
+  }
+  document.getElementById('login-error').textContent = '';
+}
+
+function toggleLoginMode() {
+  loginMode = loginMode === 'login' ? 'register' : 'login';
+  updateLoginUI();
+}
+
+function handleLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+
+  if (!username || !password) {
+    errorEl.textContent = '请填写用户名和密码';
+    return;
+  }
+
+  if (loginMode === 'register') {
+    // Check if username taken
+    if (accounts.find(a => a.username === username)) {
+      errorEl.textContent = '用户名已存在';
+      return;
+    }
+    if (password.length < 4) {
+      errorEl.textContent = '密码至少4位';
+      return;
+    }
+    const role = accounts.length === 0 ? 'admin' : (document.getElementById('login-role').value || 'employee');
+    const newAccount = {
+      username,
+      password: btoa(password), // Simple encoding (not encryption, but sufficient for local app)
+      role,
+      createdAt: new Date().toISOString()
+    };
+    accounts.push(newAccount);
+    saveAccounts();
+    currentUser = { username, role };
+    saveCurrentUser();
+    hideLogin();
+    updateTopbarUser();
+    initApp();
+    showToast('✅ 注册成功，欢迎 ' + username);
+  } else {
+    // Login
+    const acc = accounts.find(a => a.username === username && a.password === btoa(password));
+    if (!acc) {
+      errorEl.textContent = '用户名或密码错误';
+      return;
+    }
+    currentUser = { username, role: acc.role };
+    saveCurrentUser();
+    hideLogin();
+    updateTopbarUser();
+    initApp();
+    showToast('✅ 欢迎回来，' + username);
+  }
+}
+
+function logout() {
+  if (!confirm('确定退出登录？')) return;
+  currentUser = null;
+  saveCurrentUser();
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  loginMode = 'login';
+  updateLoginUI();
+  showLogin();
+}
+
+function updateTopbarUser() {
+  if (!currentUser) return;
+  document.getElementById('topbar-username').textContent = currentUser.username;
+  const roleEl = document.getElementById('topbar-role');
+  roleEl.textContent = currentUser.role === 'admin' ? '管理员' : '员工';
+  roleEl.className = 'role-badge ' + (currentUser.role === 'admin' ? 'role-admin' : 'role-employee');
+  document.getElementById('topbar-subtitle').textContent = currentUser.role === 'admin' ? '进销存管理 · 全局视图' : '进销存管理 · 个人视图';
+}
+
+// Get products visible to current user
+function getVisibleProducts() {
+  if (!currentUser) return products;
+  if (currentUser.role === 'admin') return products;
+  // Employee: see own + proxy sales where they are the supplier
+  return products.filter(p => p.createdBy === currentUser.username);
+}
+
+// ====== Settings / Account Management ======
+function showSettings() {
+  if (!currentUser) return;
+  const isAdmin = currentUser.role === 'admin';
+  let html = '';
+
+  // Current user info
+  html += `<div class="settings-section">
+    <h3>👤 当前账号</h3>
+    <div class="account-item">
+      <div class="account-avatar">${currentUser.username.charAt(0).toUpperCase()}</div>
+      <div class="account-info">
+        <div class="name">${currentUser.username}</div>
+        <div class="role">${currentUser.role === 'admin' ? '🔑 管理员 - 可查看所有数据' : '👷 员工 - 仅查看自己的数据'}</div>
+      </div>
+    </div>
+    <button class="btn btn-outline btn-sm btn-block" onclick="logout()" style="margin-top:8px">退出登录</button>
+  </div>`;
+
+  // Change password
+  html += `<div class="settings-section">
+    <h3>🔒 修改密码</h3>
+    <div class="form-group"><label>当前密码</label><input type="password" id="set-old-pwd" placeholder="输入当前密码"></div>
+    <div class="form-group"><label>新密码</label><input type="password" id="set-new-pwd" placeholder="至少4位"></div>
+    <button class="btn btn-primary btn-sm" onclick="changePassword()">修改密码</button>
+  </div>`;
+
+  // Admin: account management
+  if (isAdmin) {
+    html += `<div class="settings-section">
+      <h3>👥 账号管理 <span style="font-size:12px;color:var(--text-secondary);font-weight:400">（共${accounts.length}个账号）</span></h3>`;
+    accounts.forEach(acc => {
+      const isMe = acc.username === currentUser.username;
+      html += `<div class="account-item">
+        <div class="account-avatar" style="${acc.role==='admin'?'background:var(--accent)':'background:#1976d2'}">${acc.username.charAt(0).toUpperCase()}</div>
+        <div class="account-info">
+          <div class="name">${acc.username} ${isMe ? '<span style="font-size:11px;color:var(--accent)">（当前）</span>' : ''}</div>
+          <div class="role">${acc.role === 'admin' ? '🔑 管理员' : '👷 员工'} · 录入${products.filter(p=>p.createdBy===acc.username).length}件</div>
+          <div class="time">注册于 ${new Date(acc.createdAt).toLocaleDateString('zh-CN')}</div>
+        </div>
+        <div class="account-actions">
+          ${!isMe ? `<button class="btn btn-sm btn-outline" onclick="toggleRole('${acc.username}')">${acc.role==='admin'?'降为员工':'升为管理员'}</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteAccount('${acc.username}')">删除</button>` : ''}
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+
+    // Add new account
+    html += `<div class="settings-section">
+      <h3>➕ 添加新账号</h3>
+      <div class="form-group"><label>用户名</label><input type="text" id="set-new-user" placeholder="新账号用户名"></div>
+      <div class="form-group"><label>密码</label><input type="password" id="set-new-pwd-user" placeholder="至少4位"></div>
+      <div class="form-group"><label>角色</label>
+        <select id="set-new-role">
+          <option value="employee">员工</option>
+          <option value="admin">管理员</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addNewAccount()">添加账号</button>
+    </div>`;
+  } else {
+    // Employee info
+    const myProducts = products.filter(p => p.createdBy === currentUser.username);
+    html += `<div class="settings-section">
+      <h3>📊 我的数据</h3>
+      <div style="font-size:13px;color:var(--text-secondary)">
+        我录入的商品：${myProducts.length}件<br>
+        其中在库：${myProducts.filter(p=>p.status==='在库').length}件 · 已售：${myProducts.filter(p=>p.status==='已售'||p.status==='代售').length}件
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('settings-content').innerHTML = html;
+  document.getElementById('modal-settings').classList.add('active');
+}
+
+function changePassword() {
+  const oldPwd = document.getElementById('set-old-pwd').value;
+  const newPwd = document.getElementById('set-new-pwd').value;
+  if (!oldPwd || !newPwd) return showToast('❌ 请填写完整');
+  if (newPwd.length < 4) return showToast('❌ 新密码至少4位');
+
+  const acc = accounts.find(a => a.username === currentUser.username);
+  if (!acc || acc.password !== btoa(oldPwd)) return showToast('❌ 当前密码错误');
+
+  acc.password = btoa(newPwd);
+  saveAccounts();
+  showToast('✅ 密码修改成功');
+  closeModal('modal-settings');
+}
+
+function toggleRole(username) {
+  const acc = accounts.find(a => a.username === username);
+  if (!acc) return;
+  const newRole = acc.role === 'admin' ? 'employee' : 'admin';
+  if (!confirm(`确定将 ${username} ${newRole === 'admin' ? '升为管理员' : '降为员工'}？`)) return;
+  acc.role = newRole;
+  saveAccounts();
+  showSettings(); // Refresh
+  showToast('✅ 角色已更新');
+}
+
+function deleteAccount(username) {
+  const acc = accounts.find(a => a.username === username);
+  if (!acc) return;
+  const productCount = products.filter(p => p.createdBy === username).length;
+  if (!confirm(`确定删除账号 ${username}？\n该账号录入了${productCount}件商品数据，删除后数据仍保留。`)) return;
+  accounts = accounts.filter(a => a.username !== username);
+  saveAccounts();
+  showSettings();
+  showToast('✅ 账号已删除');
+}
+
+function addNewAccount() {
+  const username = document.getElementById('set-new-user').value.trim();
+  const password = document.getElementById('set-new-pwd-user').value;
+  const role = document.getElementById('set-new-role').value;
+
+  if (!username || !password) return showToast('❌ 请填写完整');
+  if (password.length < 4) return showToast('❌ 密码至少4位');
+  if (accounts.find(a => a.username === username)) return showToast('❌ 用户名已存在');
+
+  accounts.push({ username, password: btoa(password), role, createdAt: new Date().toISOString() });
+  saveAccounts();
+  showSettings();
+  showToast('✅ 账号已添加：' + username);
+}
+
+// ====== Quick Add Employee ======
+function quickAddEmployee() {
+  document.getElementById('qae-username').value = '';
+  document.getElementById('qae-password').value = '1234';
+  document.getElementById('modal-add-employee').classList.add('active');
+}
+
+function doQuickAddEmployee() {
+  const username = document.getElementById('qae-username').value.trim();
+  const password = document.getElementById('qae-password').value || '1234';
+
+  if (!username) return showToast('❌ 请输入员工用户名');
+  if (accounts.find(a => a.username === username)) return showToast('❌ 用户名已存在');
+
+  accounts.push({ username, password: btoa(password), role: 'employee', createdAt: new Date().toISOString() });
+  saveAccounts();
+  closeModal('modal-add-employee');
+  refreshDashboard();
+  showToast('✅ 员工「' + username + '」已添加，密码：' + password);
+}
+
+// ====== Cloud Sync ======
+async function cloudPull() {
+  try {
+    const res = await fetch(CLOUD_URL + '?t=' + Date.now());
+    const text = await res.text();
+    // Try to parse JSON - the URL might return HTML wrapper, extract JSON
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch(e) {
+      // If HTML, try to find JSON in it
+      const match = text.match(/\{[\s\S]*"products"[\s\S]*\}/);
+      if (match) data = JSON.parse(match[0]);
+      else throw new Error('无法解析云端数据');
+    }
+    if (!data || !Array.isArray(data.products)) throw new Error('数据格式错误');
+    
+    if (data.products.length === 0 && (!data.accounts || data.accounts.length === 0)) {
+      showToast('☁️ 云端暂无数据');
+      return;
+    }
+    
+    // Merge accounts (admin only)
+    if (data.accounts && Array.isArray(data.accounts) && currentUser && currentUser.role === 'admin') {
+      const localAccountNames = new Set(accounts.map(a => a.username));
+      data.accounts.forEach(acc => {
+        if (!localAccountNames.has(acc.username)) {
+          accounts.push(acc);
+          localAccountNames.add(acc.username);
+        }
+      });
+      saveAccounts();
+    }
+    
+    // Merge strategy: use cloud as base, add local-only items
+    const cloudIds = new Set(data.products.map(p => p.id));
+    const localOnly = products.filter(p => !cloudIds.has(p.id));
+    const localUpdated = {};
+    products.forEach(p => { localUpdated[p.id] = p.updatedAt || p.createdAt; });
+    
+    // For items in both, keep the newer version
+    const merged = data.products.map(cp => {
+      if (!cp.createdBy) cp.createdBy = '';
+      const lp = products.find(p => p.id === cp.id);
+      if (lp) {
+        const lpTime = new Date(lp.updatedAt || lp.createdAt || 0).getTime();
+        const cpTime = new Date(cp.updatedAt || cp.createdAt || 0).getTime();
+        return lpTime >= cpTime ? lp : cp;
+      }
+      return cp;
+    });
+    // Add local-only items
+    localOnly.forEach(p => merged.push(p));
+    
+    products = merged;
+    save();
+    lastSyncTime = new Date().toISOString();
+    localStorage.setItem('luxe_last_sync', lastSyncTime);
+    refreshDashboard();
+    renderInventory();
+    showToast('✅ 已从云端同步 ' + data.products.length + ' 条数据');
+  } catch(err) {
+    console.error('Cloud pull error:', err);
+    showToast('❌ 云端拉取失败：' + err.message);
+  }
+}
+
+async function cloudPush() {
+  const syncData = {
+    version: 2,
+    updated: new Date().toISOString(),
+    products: products,
+    accounts: accounts
+  };
+  const jsonStr = JSON.stringify(syncData);
+  
+  // Copy to clipboard for user to send to agent
+  try {
+    await navigator.clipboard.writeText(jsonStr);
+    showToast('📋 数据已复制到剪贴板！请发送给小锐（在对话框粘贴），她会帮你更新云端（含商品+账号数据）');
+  } catch(e) {
+    // Fallback: show in a modal
+    prompt('请复制以下数据，发送给小锐更新云端：', jsonStr);
+  }
+}
+
+function autoCloudSync() {
+  // On page load, try to pull from cloud
+  cloudPull();
+}
+
+function showToast(msg) {
+  const existing = document.getElementById('toast-msg');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'toast-msg';
+  toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:500;white-space:nowrap;animation:fadeInOut 3s ease;pointer-events:none;';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// ====== Image Processing ======
+function compressImage(file, maxWidth, quality) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = h * maxWidth / w; w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleImageUpload(event) {
+  const files = Array.from(event.target.files);
+  const remaining = 6 - tempImages.length;
+  if (remaining <= 0) { alert('最多上传6张图片'); event.target.value=''; return; }
+  const toProcess = files.slice(0, remaining);
+  for (const file of toProcess) {
+    const compressed = await compressImage(file, 800, 0.7);
+    tempImages.push(compressed);
+  }
+  renderImagePreviews();
+  event.target.value = '';
+}
+
+function removeTempImage(index) {
+  tempImages.splice(index, 1);
+  renderImagePreviews();
+}
+
+function renderImagePreviews() {
+  const grid = document.getElementById('img-preview-grid');
+  if (tempImages.length === 0) { grid.innerHTML = ''; return; }
+  grid.innerHTML = tempImages.map((img, i) => `
+    <div class="img-preview-item">
+      <img src="${img}" alt="商品图${i+1}">
+      ${i === 0 ? '<span class="img-primary">封面</span>' : ''}
+      <span class="img-remove" onclick="removeTempImage(${i})">✕</span>
+    </div>
+  `).join('');
+}
+
+function getProductThumb(p) {
+  if (p.images && p.images.length > 0) {
+    return `<div class="product-thumb"><img src="${p.images[0]}" alt="${p.brand}"></div>`;
+  }
+  return `<div class="product-thumb"><span class="thumb-icon">${getCategoryIcon(p.category)}</span></div>`;
+}
+
+// Image Viewer
+function openImageViewer(images, index) {
+  viewerImages = images;
+  viewerIndex = index || 0;
+  updateViewer();
+  document.getElementById('img-viewer').classList.add('active');
+}
+
+function closeImageViewer() {
+  document.getElementById('img-viewer').classList.remove('active');
+}
+
+function viewerNav(dir) {
+  viewerIndex = (viewerIndex + dir + viewerImages.length) % viewerImages.length;
+  updateViewer();
+}
+
+function updateViewer() {
+  document.getElementById('viewer-img').src = viewerImages[viewerIndex];
+  document.getElementById('viewer-counter').textContent = `${viewerIndex + 1} / ${viewerImages.length}`;
+}
+
+function switchGalleryImg(index, images) {
+  const mainImg = document.getElementById('gallery-main-img');
+  if (mainImg) mainImg.src = images[index];
+  const thumbs = document.querySelectorAll('#detail-gallery .gallery-thumbs .thumb');
+  thumbs.forEach((t, i) => t.classList.toggle('active', i === index));
+  // Update the main image onclick to open viewer at correct index
+  const mainDiv = document.querySelector('#detail-gallery .gallery-main');
+  if (mainDiv) {
+    mainDiv.setAttribute('onclick', `openImageViewer(${JSON.stringify(images).replace(/"/g, '&quot;')}, ${index})`);
+  }
+}
+
+// Keyboard support for image viewer
+document.addEventListener('keydown', function(e) {
+  const viewer = document.getElementById('img-viewer');
+  if (!viewer.classList.contains('active')) return;
+  if (e.key === 'Escape') closeImageViewer();
+  if (e.key === 'ArrowLeft') viewerNav(-1);
+  if (e.key === 'ArrowRight') viewerNav(1);
+});
+
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function formatMoney(n) {
+  if (n === 0) return '¥0';
+  const abs = Math.abs(n);
+  if (abs >= 10000) return (n < 0 ? '-' : '') + '¥' + (abs / 10000).toFixed(2) + '万';
+  return (n < 0 ? '-' : '') + '¥' + abs.toLocaleString('zh-CN', {minimumFractionDigits:0, maximumFractionDigits:2});
+}
+
+function formatDate(d) { return d || '-'; }
+
+function todayStr() { return new Date().toISOString().slice(0,10); }
+
+function daysBetween(d1, d2) {
+  const a = new Date(d1), b = new Date(d2);
+  return Math.round((b - a) / 86400000);
+}
+
+// ====== Navigation ======
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector(`.bottom-nav .nav-item[data-page="${name}"]`).classList.add('active');
+  if (name === 'home') refreshDashboard();
+  if (name === 'inventory') renderInventory();
+  if (name === 'sales') refreshSalesPage();
+  if (name === 'stats') refreshStats();
+}
+
+document.querySelectorAll('.bottom-nav .nav-item').forEach(item => {
+  item.addEventListener('click', () => switchPage(item.dataset.page));
+});
+
+// ====== Add / Edit Product ======
+function showAddProduct() {
+  editingId = null;
+  clearForm();
+  document.getElementById('f-purchaseDate').value = todayStr();
+  document.getElementById('btn-add').textContent = '确认入库';
+  document.getElementById('btn-cancel').style.display = 'none';
+  switchPage('add');
+}
+
+function clearForm() {
+  ['f-brand','f-model','f-purchasePrice','f-publicPrice','f-expectedPrice','f-extraCost','f-location','f-notes'].forEach(id => document.getElementById(id).value = '');
+  ['f-category','f-condition','f-purchaseChannel'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-purchaseDate').value = '';
+  tempImages = [];
+  renderImagePreviews();
+}
+
+function addProduct() {
+  const brand = document.getElementById('f-brand').value.trim();
+  const category = document.getElementById('f-category').value;
+  const condition = document.getElementById('f-condition').value;
+  const model = document.getElementById('f-model').value.trim();
+  const purchasePrice = parseFloat(document.getElementById('f-purchasePrice').value) || 0;
+  const publicPrice = parseFloat(document.getElementById('f-publicPrice').value) || 0;
+  const expectedPrice = parseFloat(document.getElementById('f-expectedPrice').value) || 0;
+  const extraCost = parseFloat(document.getElementById('f-extraCost').value) || 0;
+  const purchaseDate = document.getElementById('f-purchaseDate').value || todayStr();
+  const purchaseChannel = document.getElementById('f-purchaseChannel').value;
+  const location = document.getElementById('f-location').value.trim();
+  const notes = document.getElementById('f-notes').value.trim();
+
+  if (!brand) return alert('请填写品牌');
+  if (!category) return alert('请选择分类');
+  if (!condition) return alert('请选择成色');
+  if (purchasePrice <= 0) return alert('请填写购入价');
+
+  if (editingId) {
+    const p = products.find(x => x.id === editingId);
+    if (p) {
+      Object.assign(p, { brand, category, condition, model, purchasePrice, publicPrice, expectedPrice, extraCost, purchaseDate, purchaseChannel, location, notes, images: [...tempImages], updatedAt: new Date().toISOString() });
+      save();
+      editingId = null;
+      clearForm();
+      switchPage('inventory');
+      showToast('✅ 修改已保存！');
+    }
+    return;
+  }
+
+  products.push({
+    id: genId(), brand, category, condition, model,
+    purchasePrice, publicPrice, expectedPrice, extraCost,
+    purchaseDate, purchaseChannel, location, notes,
+    images: [...tempImages],
+    status: '在库', sellPrice: 0, sellDate: '', sellChannel: '', buyer: '', tracking: '', returnReason: '',
+    createdBy: currentUser ? currentUser.username : '',
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+  });
+  save();
+  clearForm();
+  switchPage('home');
+  refreshDashboard();
+  showToast('✅ 入库成功！');
+}
+
+function editProduct(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  // Permission check: employee can only edit own products
+  if (currentUser && currentUser.role !== 'admin' && p.createdBy !== currentUser.username) {
+    return showToast('❌ 你只能编辑自己录入的商品');
+  }
+  editingId = id;
+  document.getElementById('f-brand').value = p.brand;
+  document.getElementById('f-category').value = p.category;
+  document.getElementById('f-condition').value = p.condition;
+  document.getElementById('f-model').value = p.model;
+  document.getElementById('f-purchasePrice').value = p.purchasePrice;
+  document.getElementById('f-publicPrice').value = p.publicPrice || '';
+  document.getElementById('f-expectedPrice').value = p.expectedPrice || '';
+  document.getElementById('f-extraCost').value = p.extraCost || '';
+  document.getElementById('f-purchaseDate').value = p.purchaseDate;
+  document.getElementById('f-purchaseChannel').value = p.purchaseChannel;
+  document.getElementById('f-location').value = p.location;
+  document.getElementById('f-notes').value = p.notes;
+  tempImages = p.images ? [...p.images] : [];
+  renderImagePreviews();
+  document.getElementById('btn-add').textContent = '保存修改';
+  document.getElementById('btn-cancel').style.display = '';
+  switchPage('add');
+}
+
+function cancelEdit() { editingId = null; clearForm(); switchPage('inventory'); }
+
+function deleteProduct(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  // Permission check: employee can only delete own products
+  if (currentUser && currentUser.role !== 'admin' && p.createdBy !== currentUser.username) {
+    return showToast('❌ 你只能删除自己录入的商品');
+  }
+  if (!confirm('确定要删除该商品吗？此操作不可恢复。')) return;
+  products = products.filter(x => x.id !== id);
+  save();
+  closeModal('modal-detail');
+  refreshDashboard();
+  renderInventory();
+}
+
+// ====== Dashboard ======
+function refreshDashboard() {
+  const visible = getVisibleProducts();
+  const inStock = visible.filter(p => p.status === '在库');
+  const sold = visible.filter(p => p.status === '已售' || p.status === '代售');
+  const totalCost = inStock.reduce((s, p) => s + p.purchasePrice + (p.extraCost || 0), 0);
+  const totalRevenue = sold.reduce((s, p) => s + (p.sellPrice || 0), 0);
+  const totalCostSold = sold.reduce((s, p) => s + p.purchasePrice + (p.extraCost || 0), 0);
+  const totalProfit = totalRevenue - totalCostSold;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const monthSold = sold.filter(p => p.sellDate && p.sellDate >= monthStart.slice(0,10));
+  const monthRevenue = monthSold.reduce((s, p) => s + (p.sellPrice || 0), 0);
+  const monthProfit = monthSold.reduce((s, p) => s + (p.sellPrice || 0) - p.purchasePrice - (p.extraCost || 0), 0);
+
+  document.getElementById('stat-count').textContent = inStock.length;
+  document.getElementById('stat-cost').textContent = formatMoney(totalCost);
+  document.getElementById('stat-revenue').textContent = formatMoney(totalRevenue);
+  document.getElementById('stat-month-revenue').textContent = formatMoney(monthRevenue);
+  document.getElementById('stat-profit').textContent = formatMoney(totalProfit);
+  document.getElementById('stat-profit').className = 'stat-value ' + (totalProfit >= 0 ? 'success' : 'danger');
+  document.getElementById('stat-month-profit').textContent = formatMoney(monthProfit);
+  document.getElementById('stat-month-profit').className = 'stat-value accent ' + (monthProfit >= 0 ? '' : '');
+
+  // Recent activity
+  const recent = [...visible].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)).slice(0, 5);
+  const recentHtml = recent.length === 0
+    ? '<div class="empty-state"><div class="icon">📦</div><div class="text">暂无商品，点击"新增入库"开始</div></div>'
+    : recent.map(p => {
+      const creatorTag = (currentUser && currentUser.role === 'admin' && p.createdBy) ? `<span style="font-size:10px;color:var(--text-secondary);margin-left:4px">@${p.createdBy}</span>` : '';
+      return `
+      <div class="product-item" onclick="showDetail('${p.id}')">
+        ${getProductThumb(p)}
+        <div class="product-info">
+          <div class="name">${p.brand} ${p.model || ''}${creatorTag}</div>
+          <div class="meta">${p.category} · ${p.condition} · ${p.purchaseDate}</div>
+        </div>
+        <div class="product-price">
+          <div class="price">${p.status==='已售' ? formatMoney(p.sellPrice) : formatMoney(p.purchasePrice)}</div>
+          <div class="status-tag status-${p.status}">${p.status}</div>
+        </div>
+      </div>
+    `}).join('');
+  document.getElementById('recent-list').innerHTML = recentHtml;
+  document.getElementById('recent-count').textContent = `共${visible.length}件`;
+
+  // Alerts - stale inventory
+  const stale = inStock.filter(p => {
+    const days = daysBetween(p.purchaseDate, todayStr());
+    return days > 90;
+  });
+  const alertSection = document.getElementById('alert-section');
+  if (stale.length > 0) {
+    alertSection.style.display = '';
+    document.getElementById('alert-list').innerHTML = stale.map(p => `
+      <div class="alert-item" onclick="showDetail('${p.id}')">
+        <span class="alert-icon">⚠️</span>
+        <span class="alert-text">${p.brand} ${p.model||''} 已入库${daysBetween(p.purchaseDate,todayStr())}天</span>
+        <span class="alert-time">成本${formatMoney(p.purchasePrice)}</span>
+      </div>
+    `).join('');
+  } else {
+    alertSection.style.display = 'none';
+  }
+
+  // Sync time display
+  const syncTimeEl = document.getElementById('sync-time');
+  if (syncTimeEl && lastSyncTime) {
+    const d = new Date(lastSyncTime);
+    syncTimeEl.textContent = '上次同步: ' + d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+  }
+
+  // Team card (admin only)
+  const teamCard = document.getElementById('team-card');
+  if (teamCard && currentUser && currentUser.role === 'admin') {
+    teamCard.style.display = '';
+    const employeeCount = accounts.filter(a => a.role === 'employee').length;
+    const adminCount = accounts.filter(a => a.role === 'admin').length;
+    document.getElementById('team-summary').textContent = `${adminCount}个管理员 · ${employeeCount}个员工 · 共${accounts.length}个账号`;
+  } else if (teamCard) {
+    teamCard.style.display = 'none';
+  }
+}
+
+function getCategoryIcon(cat) {
+  const icons = {'腕表':'⌚','箱包':'👜','珠宝':'💎','服饰':'👔','鞋靴':'👟','配饰':'💍','其他':'📦'};
+  return icons[cat] || '📦';
+}
+
+// ====== Inventory ======
+function renderInventory() {
+  const keyword = document.getElementById('search-input').value.trim().toLowerCase();
+  let filtered = getVisibleProducts();
+
+  if (currentFilter === '在库' || currentFilter === '已售' || currentFilter === '退货' || currentFilter === '代售') {
+    filtered = filtered.filter(p => p.status === currentFilter);
+  } else if (['腕表','箱包','珠宝','服饰','鞋靴','配饰'].includes(currentFilter)) {
+    filtered = filtered.filter(p => p.category === currentFilter);
+  }
+
+  if (keyword) {
+    filtered = filtered.filter(p =>
+      p.brand.toLowerCase().includes(keyword) ||
+      (p.model && p.model.toLowerCase().includes(keyword)) ||
+      (p.notes && p.notes.toLowerCase().includes(keyword))
+    );
+  }
+
+  filtered.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+  if (filtered.length === 0) {
+    document.getElementById('inventory-list').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><div class="text">没有找到匹配的商品</div></div>';
+    return;
+  }
+
+  document.getElementById('inventory-list').innerHTML = filtered.map(p => {
+    const creatorTag = (currentUser && currentUser.role === 'admin' && p.createdBy) ? ` <span style="font-size:10px;color:var(--text-secondary)">@${p.createdBy}</span>` : '';
+    return `
+    <div class="product-item-wrapper">
+      <div class="product-item" onclick="showDetail('${p.id}')" ontouchstart="handleSwipeStart(event)" ontouchmove="handleSwipeMove(event,'${p.id}')" ontouchend="handleSwipeEnd(event)">
+        ${getProductThumb(p)}
+        <div class="product-info">
+          <div class="name">${p.brand} ${p.model || ''}${creatorTag}</div>
+          <div class="meta">${p.category} · ${p.condition} · ${formatDate(p.purchaseDate)}</div>
+        </div>
+        <div class="product-price">
+          <div class="price">${p.status==='已售' ? formatMoney(p.sellPrice) : formatMoney(p.purchasePrice)}</div>
+          <div class="status-tag status-${p.status}">${p.status}</div>
+        </div>
+      </div>
+      <div class="swipe-delete" onclick="quickDelete('${p.id}')">删除</div>
+    </div>
+  `}).join('');
+}
+
+function setFilter(el) {
+  document.querySelectorAll('.filter-tag').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  currentFilter = el.dataset.filter;
+  renderInventory();
+}
+
+// ====== Swipe to Delete ======
+let swipeStartX = 0;
+let swipeCurrentItem = null;
+
+function handleSwipeStart(e) {
+  swipeStartX = e.touches[0].clientX;
+}
+
+function handleSwipeMove(e, id) {
+  const diff = swipeStartX - e.touches[0].clientX;
+  const item = e.currentTarget;
+  if (diff > 50) {
+    item.classList.add('swiped');
+    swipeCurrentItem = item;
+  } else if (diff < -30) {
+    item.classList.remove('swiped');
+    swipeCurrentItem = null;
+  }
+}
+
+function handleSwipeEnd(e) {
+  // Reset other swiped items
+  document.querySelectorAll('.product-item.swiped').forEach(el => {
+    if (el !== swipeCurrentItem) el.classList.remove('swiped');
+  });
+}
+
+function quickDelete(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  if (currentUser && currentUser.role !== 'admin' && p.createdBy !== currentUser.username) {
+    return showToast('❌ 你只能删除自己录入的商品');
+  }
+  if (!confirm(`确定删除「${p.brand} ${p.model||''}」？`)) return;
+  products = products.filter(x => x.id !== id);
+  save();
+  refreshDashboard();
+  renderInventory();
+  showToast('🗑️ 已删除');
+}
+
+// Reset swipe when clicking elsewhere
+document.addEventListener('click', function(e) {
+  if (swipeCurrentItem && !e.target.closest('.product-item') && !e.target.closest('.swipe-delete')) {
+    document.querySelectorAll('.product-item.swiped').forEach(el => el.classList.remove('swiped'));
+    swipeCurrentItem = null;
+  }
+});
+
+// ====== Product Detail ======
+function showDetail(id) {
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('modal-detail-title').textContent = `${p.brand} ${p.model || ''}`;
+  const totalCost = p.purchasePrice + (p.extraCost || 0);
+  const profit = (p.status === '已售' || p.status === '代售') ? (p.sellPrice || 0) - totalCost : 0;
+  const profitRate = (p.status === '已售' || p.status === '代售') && totalCost > 0 ? ((profit / totalCost) * 100).toFixed(1) : 0;
+
+  document.getElementById('modal-detail-content').innerHTML = `
+    <div class="detail-gallery" id="detail-gallery">
+      ${p.images && p.images.length > 0 ? `
+        <div class="gallery-main" onclick="openImageViewer(${JSON.stringify(p.images).replace(/"/g, '&quot;')}, 0)">
+          <img src="${p.images[0]}" alt="${p.brand}" id="gallery-main-img">
+        </div>
+        ${p.images.length > 1 ? `
+          <div class="gallery-thumbs">
+            ${p.images.map((img, i) => `
+              <div class="thumb ${i===0?'active':''}" onclick="switchGalleryImg(${i}, ${JSON.stringify(p.images).replace(/"/g, '&quot;')})">
+                <img src="${img}" alt="图${i+1}">
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      ` : `
+        <div class="gallery-main">
+          <span class="gallery-placeholder">${getCategoryIcon(p.category)}</span>
+        </div>
+      `}
+    </div>
+    <div style="text-align:center;margin-bottom:12px">
+      <span class="status-tag status-${p.status}">${p.status}</span>
+    </div>
+    <div class="detail-row"><span class="label">品牌</span><span class="value">${p.brand}</span></div>
+    <div class="detail-row"><span class="label">分类</span><span class="value">${p.category}</span></div>
+    <div class="detail-row"><span class="label">成色</span><span class="value">${p.condition}</span></div>
+    <div class="detail-row"><span class="label">系列/型号</span><span class="value">${p.model || '-'}</span></div>
+    <div class="detail-row"><span class="label">公价</span><span class="value">${p.publicPrice ? formatMoney(p.publicPrice) : '-'}</span></div>
+    <div class="detail-row"><span class="label">购入价</span><span class="value" style="color:var(--warning)">${formatMoney(p.purchasePrice)}</span></div>
+    <div class="detail-row"><span class="label">额外成本</span><span class="value">${p.extraCost ? formatMoney(p.extraCost) : '-'}</span></div>
+    <div class="detail-row"><span class="label">总成本</span><span class="value" style="font-weight:700">${formatMoney(totalCost)}</span></div>
+    <div class="detail-row"><span class="label">期望售价</span><span class="value">${p.expectedPrice ? formatMoney(p.expectedPrice) : '-'}</span></div>
+    ${p.status === '已售' || p.status === '代售' ? `
+      <div class="detail-row"><span class="label">售出价</span><span class="value" style="color:var(--success);font-weight:700">${formatMoney(p.sellPrice)}</span></div>
+      <div class="detail-row"><span class="label">利润</span><span class="value" style="color:${profit>=0?'var(--success)':'var(--danger)'};font-weight:700">${formatMoney(profit)} (${profitRate}%)</span></div>
+      <div class="detail-row"><span class="label">售出日期</span><span class="value">${formatDate(p.sellDate)}</span></div>
+      <div class="detail-row"><span class="label">售出渠道</span><span class="value">${p.sellChannel || '-'}</span></div>
+      <div class="detail-row"><span class="label">买家</span><span class="value">${p.buyer || '-'}</span></div>
+      <div class="detail-row"><span class="label">物流单号</span><span class="value">${p.tracking || '-'}</span></div>
+    ` : ''}
+    ${p.status === '退货' ? `
+      <div class="detail-row"><span class="label">退货原因</span><span class="value">${p.returnReason || '-'}</span></div>
+    ` : ''}
+    ${p.status === '代售' ? `
+      <div class="detail-row"><span class="label">货主/同行</span><span class="value" style="color:#1976d2;font-weight:600">${p.supplier || '-'}</span></div>
+      <div class="detail-row"><span class="label">拿货价</span><span class="value">${formatMoney(p.purchasePrice)}</span></div>
+      <div class="detail-row"><span class="label">售出价</span><span class="value" style="color:var(--success);font-weight:700">${formatMoney(p.sellPrice)}</span></div>
+      <div class="detail-row"><span class="label">差价利润</span><span class="value" style="color:${((p.sellPrice||0)-p.purchasePrice)>=0?'var(--success)':'var(--danger)'};font-weight:700">${formatMoney((p.sellPrice||0)-p.purchasePrice)}</span></div>
+      <div class="detail-row"><span class="label">售出日期</span><span class="value">${formatDate(p.sellDate)}</span></div>
+      <div class="detail-row"><span class="label">售出渠道</span><span class="value">${p.sellChannel || '-'}</span></div>
+      <div class="detail-row"><span class="label">买家</span><span class="value">${p.buyer || '-'}</span></div>
+      <div class="detail-row"><span class="label">物流单号</span><span class="value">${p.tracking || '-'}</span></div>
+    ` : ''}
+    <div class="detail-row"><span class="label">购入日期</span><span class="value">${formatDate(p.purchaseDate)}</span></div>
+    <div class="detail-row"><span class="label">购入渠道</span><span class="value">${p.purchaseChannel || '-'}</span></div>
+    <div class="detail-row"><span class="label">存放位置</span><span class="value">${p.location || '-'}</span></div>
+    <div class="detail-row"><span class="label">备注</span><span class="value">${p.notes || '-'}</span></div>
+    ${p.createdBy ? `<div class="detail-row"><span class="label">录入人</span><span class="value" style="color:var(--accent)">@${p.createdBy}</span></div>` : ''}
+    <div style="display:flex;gap:8px;margin-top:16px">
+      ${p.status === '在库' ? `<button class="btn btn-primary" style="flex:1" onclick="closeModal('modal-detail');quickSell('${p.id}')">💰 出售</button>` : ''}
+      ${p.status === '在库' ? `<button class="btn btn-outline" style="flex:1" onclick="closeModal('modal-detail');editProduct('${p.id}')">✏️ 编辑</button>` : ''}
+      <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}')">🗑️ 删除</button>
+    </div>
+  `;
+  document.getElementById('modal-detail').classList.add('active');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
+});
+
+// ====== Sales ======
+function refreshSalesPage() {
+  // Populate product selectors
+  const visible = getVisibleProducts();
+  const inStock = visible.filter(p => p.status === '在库');
+  const sold = visible.filter(p => p.status === '已售' || p.status === '代售');
+
+  const sProduct = document.getElementById('s-product');
+  sProduct.innerHTML = '<option value="">请选择在库商品</option>' +
+    inStock.map(p => `<option value="${p.id}">${p.brand} ${p.model||''} - ${formatMoney(p.purchasePrice)} (${p.condition})${p.createdBy && currentUser && currentUser.role==='admin' ? ' @'+p.createdBy : ''}</option>`).join('');
+
+  const rProduct = document.getElementById('r-product');
+  rProduct.innerHTML = '<option value="">请选择</option>' +
+    sold.map(p => `<option value="${p.id}">${p.brand} ${p.model||''} - ${formatMoney(p.sellPrice)}</option>`).join('');
+
+  document.getElementById('s-date').value = todayStr();
+  renderSalesHistory();
+}
+
+document.getElementById('s-product').addEventListener('change', function() {
+  const p = products.find(x => x.id === this.value);
+  const info = document.getElementById('sale-product-info');
+  if (p) {
+    info.style.display = '';
+    const thumbHtml = (p.images && p.images.length > 0) ? `<img src="${p.images[0]}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;float:right;margin-left:8px">` : '';
+    document.getElementById('sale-info-content').innerHTML = `
+      ${thumbHtml}
+      品类：${p.category} · 成色：${p.condition}<br>
+      购入价：${formatMoney(p.purchasePrice)} · 总成本：${formatMoney(p.purchasePrice + (p.extraCost||0))}<br>
+      ${p.expectedPrice ? '期望售价：' + formatMoney(p.expectedPrice) : ''}
+    `;
+    if (p.expectedPrice) document.getElementById('s-price').value = p.expectedPrice;
+  } else {
+    info.style.display = 'none';
+  }
+});
+
+function recordSale() {
+  const id = document.getElementById('s-product').value;
+  if (!id) return alert('请选择商品');
+  const sellPrice = parseFloat(document.getElementById('s-price').value) || 0;
+  if (sellPrice <= 0) return alert('请填写售出价');
+
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+  // Permission check
+  if (currentUser && currentUser.role !== 'admin' && p.createdBy !== currentUser.username) {
+    return showToast('❌ 你只能出售自己录入的商品');
+  }
+
+  p.status = '已售';
+  p.sellPrice = sellPrice;
+  p.sellDate = document.getElementById('s-date').value || todayStr();
+  p.sellChannel = document.getElementById('s-channel').value;
+  p.buyer = document.getElementById('s-buyer').value.trim();
+  p.tracking = document.getElementById('s-tracking').value.trim();
+  p.updatedAt = new Date().toISOString();
+  save();
+
+  document.getElementById('s-product').value = '';
+  document.getElementById('s-price').value = '';
+  document.getElementById('s-channel').value = '';
+  document.getElementById('s-buyer').value = '';
+  document.getElementById('s-tracking').value = '';
+  document.getElementById('sale-product-info').style.display = 'none';
+  refreshSalesPage();
+  const profit = sellPrice - p.purchasePrice - (p.extraCost||0);
+  showToast('✅ 出售成功！利润：' + formatMoney(profit));
+}
+
+function recordReturn() {
+  const id = document.getElementById('r-product').value;
+  if (!id) return alert('请选择商品');
+  const reason = document.getElementById('r-reason').value.trim();
+
+  const p = products.find(x => x.id === id);
+  if (!p) return;
+
+  p.status = '退货';
+  p.returnReason = reason;
+  p.updatedAt = new Date().toISOString();
+  save();
+
+  document.getElementById('r-product').value = '';
+  document.getElementById('r-reason').value = '';
+  refreshSalesPage();
+  showToast('✅ 退货已登记');
+}
+
+// ====== Proxy Sale (Off-inventory) ======
+function recordProxySale() {
+  const brand = document.getElementById('p-brand').value.trim();
+  const category = document.getElementById('p-category').value;
+  const condition = document.getElementById('p-condition').value;
+  const model = document.getElementById('p-model').value.trim();
+  const costPrice = parseFloat(document.getElementById('p-costPrice').value) || 0;
+  const sellPrice = parseFloat(document.getElementById('p-sellPrice').value) || 0;
+  const supplier = document.getElementById('p-supplier').value.trim();
+  const sellDate = document.getElementById('p-date').value || todayStr();
+  const sellChannel = document.getElementById('p-channel').value;
+  const buyer = document.getElementById('p-buyer').value.trim();
+  const tracking = document.getElementById('p-tracking').value.trim();
+  const notes = document.getElementById('p-notes').value.trim();
+
+  if (!brand) return alert('请填写品牌');
+  if (!category) return alert('请选择分类');
+  if (costPrice <= 0) return alert('请填写拿货价');
+  if (sellPrice <= 0) return alert('请填写售出价');
+  if (!supplier) return alert('请填写货主/同行来源');
+
+  products.push({
+    id: genId(), brand, category, condition, model,
+    purchasePrice: costPrice, publicPrice: 0, expectedPrice: 0, extraCost: 0,
+    purchaseDate: sellDate, purchaseChannel: '同行代售', location: '',
+    notes: notes,
+    images: [],
+    status: '代售', sellPrice, sellDate, sellChannel, buyer, tracking,
+    supplier, // The peer/owner who supplied the goods
+    returnReason: '',
+    createdBy: currentUser ? currentUser.username : '',
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+  });
+  save();
+
+  // Clear form
+  ['p-brand','p-model','p-costPrice','p-sellPrice','p-supplier','p-buyer','p-tracking','p-notes'].forEach(id => document.getElementById(id).value = '');
+  ['p-category','p-condition','p-channel'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('p-date').value = todayStr();
+  document.getElementById('proxy-profit-preview').style.display = 'none';
+
+  const profit = sellPrice - costPrice;
+  showToast('✅ 开单成功！利润：' + formatMoney(profit));
+  refreshSalesPage();
+}
+
+// Live profit preview for proxy sale
+['p-costPrice', 'p-sellPrice'].forEach(id => {
+  document.getElementById(id).addEventListener('input', function() {
+    const cost = parseFloat(document.getElementById('p-costPrice').value) || 0;
+    const sell = parseFloat(document.getElementById('p-sellPrice').value) || 0;
+    const preview = document.getElementById('proxy-profit-preview');
+    if (cost > 0 && sell > 0) {
+      preview.style.display = '';
+      const profit = sell - cost;
+      const profitEl = document.getElementById('proxy-profit-value');
+      profitEl.textContent = formatMoney(profit);
+      profitEl.style.color = profit >= 0 ? 'var(--success)' : 'var(--danger)';
+    } else {
+      preview.style.display = 'none';
+    }
+  });
+});
+
+function quickSell(id) {
+  switchPage('sales');
+  document.getElementById('s-product').value = id;
+  document.getElementById('s-product').dispatchEvent(new Event('change'));
+}
+
+function showProxySale() {
+  switchPage('sales');
+  // Switch to proxy tab
+  const proxyTab = document.querySelector('#page-sales .tabs .tab:nth-child(2)');
+  if (proxyTab) switchSalesTab(proxyTab, 'sales-proxy');
+}
+
+function renderSalesHistory() {
+  const sold = getVisibleProducts().filter(p => p.status === '已售' || p.status === '代售').sort((a,b) => new Date(b.sellDate) - new Date(a.sellDate));
+  if (sold.length === 0) {
+    document.getElementById('sales-history-list').innerHTML = '<div class="empty-state"><div class="icon">💰</div><div class="text">暂无销售记录</div></div>';
+    return;
+  }
+  document.getElementById('sales-history-list').innerHTML = sold.map(p => {
+    const profit = (p.sellPrice||0) - p.purchasePrice - (p.extraCost||0);
+    const supplierTag = p.status === '代售' ? ` · <span style="color:#1976d2">同行:${p.supplier||''}</span>` : '';
+    const statusTag = p.status === '代售' ? ' 🤝' : '';
+    return `
+      <div class="product-item" onclick="showDetail('${p.id}')">
+        ${getProductThumb(p)}
+        <div class="product-info">
+          <div class="name">${p.brand} ${p.model||''}${statusTag}</div>
+          <div class="meta">${p.sellChannel||'-'} · ${formatDate(p.sellDate)} · ${p.buyer||'-'}${supplierTag}</div>
+        </div>
+        <div class="product-price">
+          <div class="price" style="color:${profit>=0?'var(--success)':'var(--danger)'}">${formatMoney(profit)}</div>
+          <div style="font-size:11px;color:var(--text-secondary)">${formatMoney(p.sellPrice)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function switchSalesTab(el, tabId) {
+  el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['tab-sales-record','tab-sales-proxy','tab-sales-history'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('tab-' + tabId).style.display = '';
+  if (tabId === 'proxy') document.getElementById('p-date').value = todayStr();
+}
+
+// ====== Statistics ======
+function refreshStats() {
+  const visible = getVisibleProducts();
+  const inStock = visible.filter(p => p.status === '在库');
+  const sold = visible.filter(p => p.status === '已售' || p.status === '代售');
+  const totalCostSold = sold.reduce((s,p) => s + p.purchasePrice + (p.extraCost||0), 0);
+  const totalRevenue = sold.reduce((s,p) => s + (p.sellPrice||0), 0);
+  const inventoryValue = inStock.reduce((s,p) => s + (p.expectedPrice || p.purchasePrice), 0);
+  const avgMargin = totalCostSold > 0 ? ((totalRevenue - totalCostSold) / totalCostSold * 100).toFixed(1) : 0;
+
+  document.getElementById('st-total-in').textContent = visible.length;
+  document.getElementById('st-total-out').textContent = sold.length;
+  document.getElementById('st-inventory-value').textContent = formatMoney(inventoryValue);
+  document.getElementById('st-avg-margin').textContent = avgMargin + '%';
+  document.getElementById('st-avg-margin').className = 'stat-value ' + (avgMargin >= 0 ? 'success' : 'danger');
+
+  // Brand profit ranking
+  const brandProfit = {};
+  sold.forEach(p => {
+    if (!brandProfit[p.brand]) brandProfit[p.brand] = {revenue:0, cost:0, count:0};
+    brandProfit[p.brand].revenue += p.sellPrice || 0;
+    brandProfit[p.brand].cost += p.purchasePrice + (p.extraCost||0);
+    brandProfit[p.brand].count++;
+  });
+  const brandArr = Object.entries(brandProfit).map(([brand, d]) => ({
+    brand, revenue: d.revenue, cost: d.cost, profit: d.revenue - d.cost, count: d.count
+  })).sort((a,b) => b.profit - a.profit);
+
+  document.getElementById('brand-profit-table').innerHTML = brandArr.length === 0
+    ? '<div style="text-align:center;color:var(--text-secondary);font-size:13px;padding:12px">暂无销售数据</div>'
+    : `<div style="font-size:12px;color:var(--text-secondary);display:flex;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="flex:2">品牌</span><span style="flex:1;text-align:right">销量</span><span style="flex:1;text-align:right">利润</span>
+      </div>` +
+      brandArr.map(b => `
+        <div style="display:flex;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:center">
+          <span style="flex:2;font-weight:500">${b.brand}</span>
+          <span style="flex:1;text-align:right">${b.count}</span>
+          <span style="flex:1;text-align:right;color:${b.profit>=0?'var(--success)':'var(--danger)'};font-weight:600">${formatMoney(b.profit)}</span>
+        </div>
+      `).join('');
+
+  // Top category
+  const catCount = {};
+  inStock.forEach(p => { catCount[p.category] = (catCount[p.category]||0) + 1; });
+  const catArr = Object.entries(catCount).sort((a,b) => b[1] - a[1]);
+  document.getElementById('top-category').innerHTML = catArr.length === 0
+    ? '<div style="text-align:center;color:var(--text-secondary);font-size:13px;padding:12px">暂无数据</div>'
+    : catArr.map(([cat, count]) => `
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <span>${getCategoryIcon(cat)} ${cat}</span><span style="font-weight:600">${count}件</span>
+      </div>
+    `).join('');
+
+  // Stale alerts
+  const stale = inStock.filter(p => daysBetween(p.purchaseDate, todayStr()) > 90);
+  document.getElementById('stale-alert-list').innerHTML = stale.length === 0
+    ? '<div style="text-align:center;color:var(--text-secondary);font-size:13px;padding:12px">✅ 暂无滞销商品</div>'
+    : stale.map(p => `
+      <div class="alert-item" onclick="showDetail('${p.id}')">
+        <span class="alert-icon">⚠️</span>
+        <span class="alert-text">${p.brand} ${p.model||''}</span>
+        <span class="alert-time">${daysBetween(p.purchaseDate,todayStr())}天</span>
+      </div>
+    `).join('');
+
+  // Stocktake list
+  document.getElementById('stocktake-list').innerHTML = inStock.length === 0
+    ? '<div style="text-align:center;color:var(--text-secondary);font-size:13px">暂无在库商品</div>'
+    : `<div style="font-size:13px;color:var(--text-secondary)">在库${inStock.length}件待盘点</div>`;
+
+  // Draw charts
+  drawCharts();
+}
+
+function switchStatsTab(el, tabId) {
+  el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['tab-stats-overview','tab-stats-category','tab-stats-trend','tab-stats-report'].forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById('tab-' + tabId).style.display = '';
+  if (tabId === 'category' || tabId === 'trend') drawCharts();
+  if (tabId === 'report') initReportPage();
+}
+
+// ====== Charts (simple canvas) ======
+function drawCharts() {
+  drawCategoryChart();
+  drawCategorySalesChart();
+  drawTrendChart();
+  drawInOutChart();
+}
+
+function drawBarChart(canvasId, labels, values, colors, title) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (values.length === 0) {
+    ctx.fillStyle = '#8a8a8a';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无数据', W/2, H/2);
+    return;
+  }
+
+  const max = Math.max(...values, 1);
+  const padding = {top:20, right:20, bottom:40, left:60};
+  const chartW = W - padding.left - padding.right;
+  const chartH = H - padding.top - padding.bottom;
+  const barW = Math.min(40, chartW / values.length * 0.6);
+  const gap = chartW / values.length;
+
+  // Y axis
+  ctx.fillStyle = '#8a8a8a';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const y = padding.top + chartH - (chartH * i / 4);
+    const val = max * i / 4;
+    ctx.fillText(val >= 10000 ? (val/10000).toFixed(1)+'万' : val.toFixed(0), padding.left - 8, y + 4);
+    ctx.strokeStyle = '#eee';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(W - padding.right, y); ctx.stroke();
+  }
+
+  // Bars
+  values.forEach((v, i) => {
+    const x = padding.left + gap * i + (gap - barW) / 2;
+    const barH = (v / max) * chartH;
+    const y = padding.top + chartH - barH;
+
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, barH, [4, 4, 0, 0]);
+    ctx.fill();
+
+    // Label
+    ctx.fillStyle = '#2d2d2d';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(labels[i] || '', x + barW/2, padding.top + chartH + 16);
+  });
+}
+
+function drawPieChart(canvasId, labels, values, colors) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (values.length === 0) {
+    ctx.fillStyle = '#8a8a8a';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无数据', W/2, H/2);
+    return;
+  }
+
+  const total = values.reduce((a,b) => a+b, 0);
+  if (total === 0) return;
+
+  const cx = W * 0.4, cy = H/2, r = Math.min(cx, cy) - 20;
+  let startAngle = -Math.PI / 2;
+
+  values.forEach((v, i) => {
+    const sliceAngle = (v / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, startAngle + sliceAngle);
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    startAngle += sliceAngle;
+  });
+
+  // Donut hole
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+
+  // Legend
+  const legendX = W * 0.72;
+  let legendY = 30;
+  ctx.font = '11px sans-serif';
+  labels.forEach((l, i) => {
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(legendX, legendY, 12, 12);
+    ctx.fillStyle = '#2d2d2d';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${l} ${values[i]}`, legendX + 16, legendY + 10);
+    legendY += 22;
+  });
+}
+
+function drawCategoryChart() {
+  const cats = {};
+  getVisibleProducts().filter(p => p.status === '在库').forEach(p => { cats[p.category] = (cats[p.category]||0) + 1; });
+  const labels = Object.keys(cats), values = Object.values(cats);
+  const colors = ['#c9a96e','#1a1a2e','#e74c3c','#27ae60','#f39c12','#9b59b6','#3498db'];
+  drawPieChart('chart-category', labels, values, colors);
+}
+
+function drawCategorySalesChart() {
+  const cats = {};
+  getVisibleProducts().filter(p => p.status === '已售' || p.status === '代售').forEach(p => { cats[p.category] = (cats[p.category]||0) + (p.sellPrice||0); });
+  const labels = Object.keys(cats), values = Object.values(cats);
+  const colors = ['#c9a96e','#1a1a2e','#e74c3c','#27ae60','#f39c12','#9b59b6','#3498db'];
+  drawBarChart('chart-category-sales', labels, values, colors);
+}
+
+function drawTrendChart() {
+  const months = {};
+  getVisibleProducts().filter(p => (p.status === '已售' || p.status === '代售') && p.sellDate).forEach(p => {
+    const m = p.sellDate.slice(0,7);
+    if (!months[m]) months[m] = 0;
+    months[m] += (p.sellPrice||0) - p.purchasePrice - (p.extraCost||0);
+  });
+  const sorted = Object.entries(months).sort((a,b) => a[0].localeCompare(b[0]));
+  const labels = sorted.map(s => s[0].slice(5)), values = sorted.map(s => s[1]);
+  drawBarChart('chart-trend', labels, values, ['#c9a96e']);
+}
+
+function drawInOutChart() {
+  const months = {};
+  getVisibleProducts().forEach(p => {
+    const inM = p.purchaseDate ? p.purchaseDate.slice(0,7) : null;
+    const outM = p.sellDate ? p.sellDate.slice(0,7) : null;
+    if (inM) { if (!months[inM]) months[inM] = {in:0,out:0}; months[inM].in++; }
+    if (outM && (p.status === '已售' || p.status === '代售')) { if (!months[outM]) months[outM] = {in:0,out:0}; months[outM].out++; }
+  });
+  const sorted = Object.entries(months).sort((a,b) => a[0].localeCompare(b[0])).slice(-6);
+  const labels = sorted.map(s => s[0].slice(5));
+  const inVals = sorted.map(s => s[1].in);
+  const outVals = sorted.map(s => s[1].out);
+  const maxVal = Math.max(...inVals, ...outVals, 1);
+
+  const canvas = document.getElementById('chart-inout');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (sorted.length === 0) {
+    ctx.fillStyle = '#8a8a8a'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('暂无数据', W/2, H/2); return;
+  }
+
+  const padding = {top:20, right:20, bottom:40, left:50};
+  const chartW = W - padding.left - padding.right;
+  const chartH = H - padding.top - padding.bottom;
+  const groupW = chartW / sorted.length;
+  const barW = Math.min(20, groupW * 0.3);
+
+  // Y axis
+  ctx.fillStyle = '#8a8a8a'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const y = padding.top + chartH - (chartH * i / 4);
+    ctx.fillText(Math.round(maxVal * i / 4), padding.left - 8, y + 4);
+    ctx.strokeStyle = '#eee'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(W - padding.right, y); ctx.stroke();
+  }
+
+  sorted.forEach((s, i) => {
+    const gx = padding.left + groupW * i;
+    // In bar
+    const inH = (s[1].in / maxVal) * chartH;
+    ctx.fillStyle = '#c9a96e';
+    ctx.fillRect(gx + groupW*0.15, padding.top + chartH - inH, barW, inH);
+    // Out bar
+    const outH = (s[1].out / maxVal) * chartH;
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(gx + groupW*0.15 + barW + 2, padding.top + chartH - outH, barW, outH);
+    // Label
+    ctx.fillStyle = '#2d2d2d'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(s[0].slice(5), gx + groupW/2, padding.top + chartH + 16);
+  });
+
+  // Legend
+  ctx.fillStyle = '#c9a96e'; ctx.fillRect(W - 120, 8, 12, 12);
+  ctx.fillStyle = '#2d2d2d'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('入库', W - 104, 18);
+  ctx.fillStyle = '#1a1a2e'; ctx.fillRect(W - 60, 8, 12, 12);
+  ctx.fillStyle = '#2d2d2d'; ctx.fillText('出库', W - 44, 18);
+}
+
+// ====== Stocktake ======
+function startStocktake() {
+  const inStock = getVisibleProducts().filter(p => p.status === '在库');
+  if (inStock.length === 0) return alert('没有在库商品');
+
+  stocktakeState = {};
+  inStock.forEach(p => { stocktakeState[p.id] = false; });
+
+  document.getElementById('stocktake-modal-content').innerHTML = inStock.map(p => {
+    const thumbSrc = (p.images && p.images.length > 0) ? `<img src="${p.images[0]}" style="width:32px;height:32px;border-radius:6px;object-fit:cover">` : getCategoryIcon(p.category);
+    return `
+    <div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+      <label style="flex:1;font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" data-id="${p.id}" onchange="stocktakeState['${p.id}']=this.checked" style="width:18px;height:18px;accent-color:var(--accent)">
+        <span style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${thumbSrc}</span>
+        ${p.brand} ${p.model||''} <span style="color:var(--text-secondary)">· ${p.location||'无位置'}</span>
+      </label>
+    </div>
+  `}).join('');
+
+  document.getElementById('modal-stocktake').classList.add('active');
+}
+
+function finishStocktake() {
+  const checked = Object.values(stocktakeState).filter(v => v).length;
+  const total = Object.keys(stocktakeState).length;
+  const missing = Object.entries(stocktakeState).filter(([k,v]) => !v);
+
+  closeModal('modal-stocktake');
+
+  if (missing.length === 0) {
+    alert(`✅ 盘点完成！全部${total}件商品核对无误。`);
+  } else {
+    alert(`⚠️ 盘点完成：${checked}/${total}件已核对，${missing.length}件未找到：\n\n` +
+      missing.map(([id]) => {
+        const p = products.find(x => x.id === id);
+        return `${p.brand} ${p.model||''} (${p.location||'无位置'})`;
+      }).join('\n'));
+  }
+}
+
+// ====== Import/Export ======
+function exportData() {
+  const data = JSON.stringify(products, null, 2);
+  const blob = new Blob([data], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `二奢管家_备份_${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error('格式错误');
+      // Add createdBy to imported products that lack it
+      data.forEach(p => { if (!p.createdBy) p.createdBy = currentUser ? currentUser.username : ''; });
+      if (!confirm(`即将导入${data.length}条数据，是否与现有数据合并？\n\n确定=合并（去重） 取消=覆盖`)) {
+        products = data;
+      } else {
+        const existingIds = new Set(products.map(p => p.id));
+        data.forEach(p => { if (!existingIds.has(p.id)) products.push(p); });
+      }
+      save();
+      refreshDashboard();
+      renderInventory();
+      alert('✅ 导入成功');
+    } catch (err) {
+      alert('❌ 文件格式错误：' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ====== Reports ======
+let reportMode = 'month';
+
+function initReportPage() {
+  // Populate year selector
+  const yearSelect = document.getElementById('report-year');
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const years = new Set();
+  getVisibleProducts().forEach(p => {
+    if (p.purchaseDate) years.add(p.purchaseDate.slice(0,4));
+    if (p.sellDate) years.add(p.sellDate.slice(0,4));
+  });
+  years.add(String(currentYear));
+  const sortedYears = [...years].sort().reverse();
+  yearSelect.innerHTML = sortedYears.map(y => `<option value="${y}" ${y==currentYear?'selected':''}>${y}年</option>`).join('');
+  document.getElementById('report-month').value = String(now.getMonth()+1).padStart(2,'0');
+}
+
+function switchReportMode(mode) {
+  reportMode = mode;
+  document.getElementById('btn-report-month').className = mode === 'month' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+  document.getElementById('btn-report-year').className = mode === 'year' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+  document.getElementById('report-month-group').style.display = mode === 'month' ? '' : 'none';
+}
+
+function generateReport() {
+  const year = document.getElementById('report-year').value;
+  const month = document.getElementById('report-month').value;
+  const periodStr = reportMode === 'month' ? `${year}年${parseInt(month)}月` : `${year}年`;
+  const prefix = reportMode === 'month' ? `${year}-${month}` : year;
+
+  // Filter data for the period (based on user visibility)
+  const visible = getVisibleProducts();
+  const soldInPeriod = visible.filter(p => (p.status === '已售' || p.status === '代售') && p.sellDate && p.sellDate.startsWith(prefix));
+  const inPeriod = visible.filter(p => p.status !== '代售' && p.purchaseDate && p.purchaseDate.startsWith(prefix));
+  const returnInPeriod = visible.filter(p => p.status === '退货' && p.updatedAt && p.updatedAt.startsWith(prefix));
+
+  // Core metrics
+  const inCount = inPeriod.length;
+  const outCount = soldInPeriod.length;
+  const totalCost = inPeriod.reduce((s,p) => s + p.purchasePrice + (p.extraCost||0), 0);
+  const totalRevenue = soldInPeriod.reduce((s,p) => s + (p.sellPrice||0), 0);
+  const totalCostSold = soldInPeriod.reduce((s,p) => s + p.purchasePrice + (p.extraCost||0), 0);
+  const totalProfit = totalRevenue - totalCostSold;
+  const margin = totalCostSold > 0 ? (totalProfit / totalCostSold * 100).toFixed(1) : '0';
+
+  // Current stock
+  const inStock = visible.filter(p => p.status === '在库');
+  const stockCost = inStock.reduce((s,p) => s + p.purchasePrice + (p.extraCost||0), 0);
+
+  document.getElementById('report-title').textContent = `📊 ${periodStr} ${reportMode === 'month' ? '月度' : '年度'}报表`;
+  document.getElementById('rp-in-count').textContent = inCount;
+  document.getElementById('rp-out-count').textContent = outCount;
+  document.getElementById('rp-cost').textContent = formatMoney(totalCost);
+  document.getElementById('rp-revenue').textContent = formatMoney(totalRevenue);
+  document.getElementById('rp-profit').textContent = formatMoney(totalProfit);
+  document.getElementById('rp-profit').className = 'stat-value ' + (totalProfit >= 0 ? 'success' : 'danger');
+  document.getElementById('rp-margin').textContent = margin + '%';
+  document.getElementById('rp-margin').className = 'stat-value ' + (margin >= 0 ? 'success' : 'danger');
+  document.getElementById('rp-stock-count').textContent = inStock.length;
+  document.getElementById('rp-stock-cost').textContent = formatMoney(stockCost);
+
+  // Channel breakdown
+  const channels = {};
+  soldInPeriod.forEach(p => {
+    const ch = p.sellChannel || '未记录';
+    if (!channels[ch]) channels[ch] = {count:0, revenue:0, cost:0};
+    channels[ch].count++;
+    channels[ch].revenue += p.sellPrice || 0;
+    channels[ch].cost += p.purchasePrice + (p.extraCost||0);
+  });
+  const channelArr = Object.entries(channels).sort((a,b) => b[1].revenue - a[1].revenue);
+  document.getElementById('rp-channel-table').innerHTML = channelArr.length === 0
+    ? '<div style="text-align:center;color:var(--text-secondary);font-size:13px;padding:12px">暂无数据</div>'
+    : `<div style="display:flex;font-size:12px;color:var(--text-secondary);padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="flex:2">渠道</span><span style="flex:1;text-align:right">销量</span><span style="flex:1;text-align:right">收入</span><span style="flex:1;text-align:right">利润</span>
+      </div>` + channelArr.map(([ch, d]) => `
+        <div style="display:flex;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:center">
+          <span style="flex:2;font-weight:500">${ch}</span>
+          <span style="flex:1;text-align:right">${d.count}</span>
+          <span style="flex:1;text-align:right">${formatMoney(d.revenue)}</span>
+          <span style="flex:1;text-align:right;color:${(d.revenue-d.cost)>=0?'var(--success)':'var(--danger)'}">${formatMoney(d.revenue-d.cost)}</span>
+        </div>
+      `).join('');
+
+  // Brand breakdown
+  const brands = {};
+  soldInPeriod.forEach(p => {
+    if (!brands[p.brand]) brands[p.brand] = {count:0, revenue:0, cost:0};
+    brands[p.brand].count++;
+    brands[p.brand].revenue += p.sellPrice || 0;
+    brands[p.brand].cost += p.purchasePrice + (p.extraCost||0);
+  });
+  const brandArr = Object.entries(brands).sort((a,b) => b[1].revenue - a[1].revenue);
+  document.getElementById('rp-brand-table').innerHTML = brandArr.length === 0
+    ? '<div style="text-align:center;color:var(--text-secondary);font-size:13px;padding:12px">暂无数据</div>'
+    : `<div style="display:flex;font-size:12px;color:var(--text-secondary);padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="flex:2">品牌</span><span style="flex:1;text-align:right">销量</span><span style="flex:1;text-align:right">收入</span><span style="flex:1;text-align:right">利润</span>
+      </div>` + brandArr.map(([br, d]) => {
+        const profit = d.revenue - d.cost;
+        return `
+        <div style="display:flex;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:center">
+          <span style="flex:2;font-weight:500">${br}</span>
+          <span style="flex:1;text-align:right">${d.count}</span>
+          <span style="flex:1;text-align:right">${formatMoney(d.revenue)}</span>
+          <span style="flex:1;text-align:right;color:${profit>=0?'var(--success)':'var(--danger)'}">${formatMoney(profit)}</span>
+        </div>`;
+      }).join('');
+
+  // Category breakdown
+  const cats = {};
+  soldInPeriod.forEach(p => {
+    if (!cats[p.category]) cats[p.category] = {count:0, revenue:0, cost:0};
+    cats[p.category].count++;
+    cats[p.category].revenue += p.sellPrice || 0;
+    cats[p.category].cost += p.purchasePrice + (p.extraCost||0);
+  });
+  const catArr = Object.entries(cats).sort((a,b) => b[1].revenue - a[1].revenue);
+  document.getElementById('rp-category-table').innerHTML = catArr.length === 0
+    ? '<div style="text-align:center;color:var(--text-secondary);font-size:13px;padding:12px">暂无数据</div>'
+    : `<div style="display:flex;font-size:12px;color:var(--text-secondary);padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="flex:2">品类</span><span style="flex:1;text-align:right">销量</span><span style="flex:1;text-align:right">收入</span><span style="flex:1;text-align:right">利润</span>
+      </div>` + catArr.map(([cat, d]) => {
+        const profit = d.revenue - d.cost;
+        return `
+        <div style="display:flex;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;align-items:center">
+          <span style="flex:2;font-weight:500">${getCategoryIcon(cat)} ${cat}</span>
+          <span style="flex:1;text-align:right">${d.count}</span>
+          <span style="flex:1;text-align:right">${formatMoney(d.revenue)}</span>
+          <span style="flex:1;text-align:right;color:${profit>=0?'var(--success)':'var(--danger)'}">${formatMoney(profit)}</span>
+        </div>`;
+      }).join('');
+
+  // Monthly breakdown for annual report
+  const monthlySection = document.getElementById('rp-monthly-section');
+  if (reportMode === 'year') {
+    monthlySection.style.display = '';
+    const monthlyData = [];
+    for (let m = 1; m <= 12; m++) {
+      const mStr = String(m).padStart(2,'0');
+      const mPrefix = `${year}-${mStr}`;
+      const mSold = visible.filter(p => (p.status === '已售' || p.status === '代售') && p.sellDate && p.sellDate.startsWith(mPrefix));
+      const mIn = visible.filter(p => p.status !== '代售' && p.purchaseDate && p.purchaseDate.startsWith(mPrefix));
+      const mRevenue = mSold.reduce((s,p) => s + (p.sellPrice||0), 0);
+      const mCost = mSold.reduce((s,p) => s + p.purchasePrice + (p.extraCost||0), 0);
+      monthlyData.push({ month: m, inCount: mIn.length, outCount: mSold.length, revenue: mRevenue, cost: mCost, profit: mRevenue - mCost });
+    }
+    // Chart
+    drawBarChart('chart-report-monthly',
+      monthlyData.map(d => d.month + '月'),
+      monthlyData.map(d => d.profit),
+      ['#c9a96e']
+    );
+    // Table
+    document.getElementById('rp-monthly-table').innerHTML =
+      `<div style="display:flex;font-size:12px;color:var(--text-secondary);padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="flex:1">月份</span><span style="flex:1;text-align:right">入库</span><span style="flex:1;text-align:right">出库</span><span style="flex:1;text-align:right">收入</span><span style="flex:1;text-align:right">利润</span>
+      </div>` + monthlyData.map(d => `
+        <div style="display:flex;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;align-items:center">
+          <span style="flex:1;font-weight:500">${d.month}月</span>
+          <span style="flex:1;text-align:right">${d.inCount}</span>
+          <span style="flex:1;text-align:right">${d.outCount}</span>
+          <span style="flex:1;text-align:right">${formatMoney(d.revenue)}</span>
+          <span style="flex:1;text-align:right;color:${d.profit>=0?'var(--success)':'var(--danger)'}">${formatMoney(d.profit)}</span>
+        </div>
+      `).join('');
+  } else {
+    monthlySection.style.display = 'none';
+  }
+
+  // Top 5 deals by profit
+  const topDeals = [...soldInPeriod].map(p => ({
+    ...p,
+    profit: (p.sellPrice||0) - p.purchasePrice - (p.extraCost||0)
+  })).sort((a,b) => b.profit - a.profit).slice(0, 5);
+
+  document.getElementById('rp-top-deals').innerHTML = topDeals.length === 0
+    ? '<div style="text-align:center;color:var(--text-secondary);font-size:13px;padding:12px">暂无数据</div>'
+    : topDeals.map((p, i) => `
+      <div class="product-item" onclick="showDetail('${p.id}')" style="padding:10px 0">
+        ${getProductThumb(p)}
+        <div class="product-info">
+          <div class="name" style="font-size:13px">${i+1}. ${p.brand} ${p.model||''}</div>
+          <div class="meta">${p.sellChannel||'-'} · ${formatDate(p.sellDate)}</div>
+        </div>
+        <div class="product-price">
+          <div class="price" style="color:${p.profit>=0?'var(--success)':'var(--danger)'};font-size:14px">${formatMoney(p.profit)}</div>
+        </div>
+      </div>
+    `).join('');
+
+  document.getElementById('report-content').style.display = '';
+}
+
+function printReport() {
+  window.print();
+}
+
+function shareReport() {
+  const year = document.getElementById('report-year').value;
+  const month = document.getElementById('report-month').value;
+  const periodStr = reportMode === 'month' ? `${year}年${parseInt(month)}月` : `${year}年`;
+  const prefix = reportMode === 'month' ? `${year}-${month}` : year;
+
+  const visible = getVisibleProducts();
+  const soldInPeriod = visible.filter(p => (p.status === '已售' || p.status === '代售') && p.sellDate && p.sellDate.startsWith(prefix));
+  const inPeriod = visible.filter(p => p.status !== '代售' && p.purchaseDate && p.purchaseDate.startsWith(prefix));
+  const inStock = visible.filter(p => p.status === '在库');
+
+  const totalCost = inPeriod.reduce((s,p) => s + p.purchasePrice + (p.extraCost||0), 0);
+  const totalRevenue = soldInPeriod.reduce((s,p) => s + (p.sellPrice||0), 0);
+  const totalCostSold = soldInPeriod.reduce((s,p) => s + p.purchasePrice + (p.extraCost||0), 0);
+  const totalProfit = totalRevenue - totalCostSold;
+  const margin = totalCostSold > 0 ? (totalProfit / totalCostSold * 100).toFixed(1) : '0';
+  const stockCost = inStock.reduce((s,p) => s + p.purchasePrice + (p.extraCost||0), 0);
+
+  const text = `👜 二奢管家 - ${periodStr}${reportMode==='month'?'月度':'年度'}报表\n` +
+    `━━━━━━━━━━━━━━\n` +
+    `📦 入库：${inPeriod.length}件 | 💰 出库：${soldInPeriod.length}件\n` +
+    `💵 购入成本：${formatMoney(totalCost)}\n` +
+    `📊 销售收入：${formatMoney(totalRevenue)}\n` +
+    `📈 利润：${formatMoney(totalProfit)}（${margin}%）\n` +
+    `📋 当前库存：${inStock.length}件（成本${formatMoney(stockCost)}）\n` +
+    `━━━━━━━━━━━━━━`;
+
+  if (navigator.share) {
+    navigator.share({ title: `二奢管家${periodStr}报表`, text });
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => alert('📋 报表已复制到剪贴板'));
+  } else {
+    prompt('请复制报表内容：', text);
+  }
+}
+
+// ====== Init ======
+function initApp() {
+  migrateProducts();
+  refreshDashboard();
+  renderInventory();
+}
+
+// Auth check on load
+initAuth();
+// If already logged in, init the app
+if (currentUser) initApp();
+// Auto pull from cloud on startup
+if (currentUser) autoCloudSync();
+
+// Polyfill roundRect
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, radii) {
+    const r = radii[0] || 0;
+    this.moveTo(x + r, y);
+    this.lineTo(x + w - r, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + r);
+    this.lineTo(x + w, y + h);
+    this.lineTo(x, y + h);
+    this.lineTo(x, y + r);
+    this.quadraticCurveTo(x, y, x + r, y);
+    this.closePath();
+  };
+}
+</script>
+
+<!-- Bottom Navigation -->
+<div class="bottom-nav">
+  <div class="nav-item active" data-page="home" onclick="switchPage('home')">
+    <span class="icon">🏠</span>
+    <span class="label">首页</span>
+  </div>
+  <div class="nav-item" data-page="add" onclick="showAddProduct()">
+    <span class="icon">📦</span>
+    <span class="label">入库</span>
+  </div>
+  <div class="nav-item" data-page="inventory" onclick="switchPage('inventory')">
+    <span class="icon">📋</span>
+    <span class="label">库存</span>
+  </div>
+  <div class="nav-item" data-page="sales" onclick="switchPage('sales')">
+    <span class="icon">💰</span>
+    <span class="label">销售</span>
+  </div>
+  <div class="nav-item" data-page="stats" onclick="switchPage('stats')">
+    <span class="icon">📊</span>
+    <span class="label">统计</span>
+  </div>
+</div>
+
+</body>
+</html>
