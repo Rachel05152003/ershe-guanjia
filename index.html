@@ -1046,6 +1046,10 @@ input,select,textarea,button { font-family:inherit; font-size:14px; }
 // ====== Data Layer ======
 const CLOUD_URL = 'https://www.coze.cn/s/FvcsdpE4hQE/';
 let products = JSON.parse(localStorage.getItem('luxe_products') || '[]');
+// Clean up any [img:XXX] placeholders from previous bad syncs
+products.forEach(p => {
+  if (p.images) p.images = p.images.filter(img => !img.startsWith('[img:'));
+});
 let accounts = JSON.parse(localStorage.getItem('luxe_accounts') || '[]');
 let currentUser = JSON.parse(localStorage.getItem('luxe_current_user') || 'null');
 let stocktakeState = {};
@@ -1586,7 +1590,8 @@ async function cloudPullAndRetry() {
         }
         return winner;
       }
-      cp.images = cp.images || [];
+      // Cloud-only product - filter out invalid image placeholders
+      cp.images = (cp.images || []).filter(img => !img.startsWith('[img:'));
       return cp;
     });
     
@@ -1761,7 +1766,8 @@ async function cloudPull(silent = false) {
         return winner;
       }
       // Cloud-only product - use cloud image URLs directly
-      cp.images = cp.images || [];
+      // Cloud-only product - filter out invalid image placeholders
+      cp.images = (cp.images || []).filter(img => !img.startsWith('[img:'));
       return cp;
     });
     localOnly.forEach(p => merged.push(p));
@@ -1865,7 +1871,7 @@ function renderImagePreviews() {
 
 function getProductThumb(p) {
   if (p.images && p.images.length > 0) {
-    return `<div class="product-thumb"><img src="${p.images[0]}" alt="${p.brand}"></div>`;
+    return `<div class="product-thumb"><img src="${p.images[0]}" alt="${p.brand}" onerror="this.style.display='none';this.nextElementSibling.style.display=''"><span class="thumb-icon" style="display:none">${getCategoryIcon(p.category)}</span></div>`;
   }
   return `<div class="product-thumb"><span class="thumb-icon">${getCategoryIcon(p.category)}</span></div>`;
 }
@@ -2443,7 +2449,7 @@ function showDetail(id) {
     <div class="detail-gallery" id="detail-gallery">
       ${p.images && p.images.length > 0 ? `
         <div class="gallery-main" onclick="openImageViewer(${JSON.stringify(p.images).replace(/"/g, '&quot;')}, 0)">
-          <img src="${p.images[0]}" alt="${p.brand}" id="gallery-main-img">
+          <img src="${p.images[0]}" alt="${p.brand}" id="gallery-main-img" onerror="this.parentElement.innerHTML='<span class=gallery-placeholder>${getCategoryIcon(p.category)}</span>'">
         </div>
         ${p.images.length > 1 ? `
           <div class="gallery-thumbs">
