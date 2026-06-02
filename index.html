@@ -328,6 +328,9 @@ input,select,textarea,button { font-family:inherit; font-size:14px; }
       <button class="btn btn-primary btn-sm" onclick="cloudPull()" style="flex:1">⬇️ 立即拉取</button>
       <button class="btn btn-outline btn-sm" onclick="cloudPush()" style="flex:1">⬆️ 立即推送</button>
     </div>
+    <div style="margin-top:8px">
+      <button class="btn btn-sm btn-outline" onclick="forceResetFromCloud()" style="width:100%;color:var(--danger);border-color:var(--danger)">🔄 从云端重置（修复数据异常）</button>
+    </div>
   </div>
 
   <!-- Team Card (Admin only) -->
@@ -1782,6 +1785,69 @@ async function cloudPull(silent = false) {
   } catch(err) {
     console.error('Cloud pull error:', err);
     if (!silent) showToast('❌ 同步失败：' + err.message);
+  } finally {
+    syncInProgress = false;
+  }
+}
+
+// Force reset: completely replace local data with cloud data
+async function forceResetFromCloud() {
+  if (!confirm('⚠️ 这会用云端数据完全覆盖本地数据，本地未同步的修改会丢失。确定继续吗？')) return;
+  try {
+    syncInProgress = true;
+    showToast('⏳ 正在从云端重置...');
+    const headers = {
+      'Authorization': `token ${GITHUB_TOKEN}`,
+      'Accept': 'application/vnd.github.v3+json'
+    };
+    
+    const resp = await fetch(GITHUB_API + '?t=' + Date.now(), { headers });
+    if (!resp.ok) throw new Error('拉取失败');
+    
+    const result = await resp.json();
+    cloudSha = result.sha;
+    
+    const text = decodeURIComponent(escape(atob(result.content)));
+    const data = JSON.parse(text);
+    
+    if (!data || !Array.isArray(data.products)) throw new Error('数据格式错误');
+    
+    // Keep local images for products that have them
+    const localImageMap = {};
+    products.forEach(p => { localImageMap[p.id] = p.images || []; });
+    
+    // Use cloud data, but preserve local images
+    products = data.products.map(cp => {
+      cp.images = (cp.images || []).filter(img => !img.startsWith('[img:'));
+      const localImgs = localImageMap[cp.id] || [];
+      const hasLocalBase64 = localImgs.some(img => img.startsWith('data:'));
+      if (hasLocalBase64) cp.images = localImgs;
+      if (!cp.createdBy) cp.createdBy = '';
+      return cp;
+    });
+    
+    localStorage.setItem('luxe_products', JSON.stringify(products));
+    
+    // Also sync accounts
+    if (data.accounts) {
+      accounts = data.accounts;
+      saveAccounts();
+    }
+    
+    // Also sync ledger
+    if (data.ledgerEntries) {
+      ledgerEntries = data.ledgerEntries;
+      saveLedger();
+    }
+    
+    lastSyncTime = new Date().toISOString();
+    localStorage.setItem('luxe_last_sync', lastSyncTime);
+    
+    refreshDashboard();
+    renderInventory();
+    showToast('✅ 已从云端重置 ' + products.length + ' 条数据');
+  } catch(err) {
+    showToast('❌ 重置失败：' + err.message);
   } finally {
     syncInProgress = false;
   }
